@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>歌曲列表 - 音乐收藏</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    /* 定义现代色彩变量 */
+    :root {
+      --primary: #6366f1;         /* 现代靛蓝 */
+      --primary-hover: #4f46e5;
+      --bg-body: #fbfcfd;         /* 极浅灰蓝背景 */
+      --bg-card: #ffffff;
+      --text-main: #1e293b;       /* 深石板灰 */
+      --text-muted: #64748b;      /* 中性灰 */
+      --border-color: #f1f5f9;    /* 超浅边框 */
+      --accent-orange: #f59e0b;   /* 柔和橙色 */
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      padding: 3rem 1rem;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1000px;
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(226, 232, 240, 0.5);
+    }
+
+    h1 {
+      text-align: left; /* 改为左对齐更显高级 */
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 2rem;
+      position: relative;
+      display: flex;
+      align-items: center;
+      color: var(--text-main);
+    }
+
+    h1::before {
+      content: '';
+      width: 4px;
+      height: 1.25rem;
+      background: var(--primary);
+      margin-right: 12px;
+      border-radius: 4px;
+    }
+
+    /* 表格样式优化 */
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    .song-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .song-table th {
+      background-color: #f8fafc;
+      color: var(--text-muted);
+      padding: 1rem 1.25rem;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .song-table td {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.925rem;
+      transition: all 0.2s ease;
+    }
+
+    /* 行悬停效果：略微抬升 */
+    .song-item {
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .song-item:hover {
+      background-color: #f8faff;
+    }
+
+    .song-item:hover td {
+      color: var(--primary);
+    }
+
+    .song-name {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* 评分标识优化 */
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      font-weight: 700;
+      color: var(--accent-orange);
+      background: rgba(245, 158, 11, 0.1);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .rating-count {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-left: 6px;
+      font-weight: normal;
+    }
+
+    /* 分页控件 */
+    .pagination {
+      margin-top: 2.5rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .pagination button {
+      padding: 0.6rem 1.25rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text-main);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+    }
+
+    .pagination button:hover:not(:disabled) {
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+    }
+
+    .pagination button:disabled {
+      cursor: not-allowed;
+      opacity: 0.4;
+      background: #f1f5f9;
+    }
+
+    .pagination span {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 提示状态样式 */
+    .tip-row {
+      text-align: center;
+      padding: 4rem !important;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* 响应式 */
+    @media (max-width: 640px) {
+      .container { padding: 1.5rem; }
+      .song-table th:nth-child(3), .song-table td:nth-child(3) { display: none; } /* 移动端隐藏日期 */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>歌曲列表</h1>
+    
+    <div class="table-wrapper">
+      <table class="song-table">
+        <thead>
+          <tr>
+            <th>歌名</th>
+            <th>专辑</th>
+            <th>发行时间</th>
+            <th>评分详情</th>
+          </tr>
+        </thead>
+        <tbody id="songList">
+          </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <button id="prevBtn" disabled>← 上一页</button>
+      <span id="pageInfo">第 1 页 / 共 0 页</span>
+      <button id="nextBtn" disabled>下一页 →</button>
+    </div>
+  </div>
+
+  <script>
+    let currentPage = 1;
+    let totalPages = 0;
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    // 核心函数：拉取并渲染列表
+    async function renderSongList(page = 1) {
+      try {
+        const songListEl = document.getElementById('songList');
+        // 显示加载状态，但不清空高度防止抖动
+        songListEl.innerHTML = '<tr><td colspan="4" class="tip-row">正在同步最新资源...</td></tr>';
+
+        // 核心改进：添加 _t=Date.now() 强制禁用浏览器缓存，确保返回时拿到的是后端更新后的排序
+        const response = await axios.get('http://localhost:3000/api/all-resources/sort-by-rating', {
+          params: { 
+            page: page, 
+            pageSize: 10,
+            _t: Date.now() // 关键：时间戳防止 GET 请求缓存
+          },
+          withCredentials: true,
+          timeout: 10000
+        });
+
+        const result = response.data;
+        
+        if (result.code !== 200) {
+          songListEl.innerHTML = `<tr><td colspan="4" class="tip-row">同步失败：${escapeHtml(result.msg || '未知错误')}</td></tr>`;
+          return;
+        }
+
+        const { resources, pagination } = result.data;
+        currentPage = pagination.page;
+        totalPages = pagination.totalPages;
+
+        if (!resources || resources.length === 0) {
+          songListEl.innerHTML = '<tr><td colspan="4" class="tip-row">暂无相关歌曲数据</td></tr>';
+          updatePagination();
+          return;
+        }
+
+        // 清空并渲染
+        const fragment = document.createDocumentFragment();
+        resources.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.className = 'song-item';
+          
+          tr.innerHTML = `
+            <td class="song-name">${escapeHtml(item.name_cn)}</td>
+            <td style="color: var(--text-muted)">${escapeHtml(item.album_name || '单曲/未知')}</td>
+            <td style="color: var(--text-muted)">${escapeHtml(item.release_date || '—')}</td>
+            <td>
+              <span class="score-badge">${item.averageScore || '0.0'}</span>
+              <span class="rating-count">${item.ratingCount || 0} 评分</span>
+            </td>
+          `;
+
+          // 跳转逻辑
+          tr.onclick = () => {
+            const encodedId = encodeURIComponent(item.id);
+            if (item.type === 'song') {
+              window.location.href = `./songs-details.html?songId=${encodedId}`;
+            } else {
+              window.location.href = `./single-details.html?singleId=${encodedId}`;
+            }
+          };
+
+          fragment.appendChild(tr);
+        });
+
+        songListEl.innerHTML = '';
+        songListEl.appendChild(fragment);
+        updatePagination();
+
+      } catch (error) {
+        console.error('Data fetch error:', error);
+        let errorMsg = '网络连接异常';
+        if (error.response) errorMsg = `服务器异常 (${error.response.status})`;
+        else if (error.request) errorMsg = '无法连接到后端，请检查后端服务';
+        
+        document.getElementById('songList').innerHTML = `<tr><td colspan="4" class="tip-row">${escapeHtml(errorMsg)}</td></tr>`;
+      }
+    }
+
+    function updatePagination() {
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const pageInfo = document.getElementById('pageInfo');
+
+      prevBtn.disabled = currentPage <= 1;
+      nextBtn.disabled = currentPage >= totalPages || totalPages === 0;
+
+      pageInfo.textContent = totalPages === 0 
+        ? '0 / 0' 
+        : `第 ${currentPage} 页 / 共 ${totalPages} 页`;
+    }
+
+    // 分页点击事件
+    document.getElementById('prevBtn').onclick = () => {
+      if (currentPage > 1) renderSongList(currentPage - 1);
+    };
+
+    document.getElementById('nextBtn').onclick = () => {
+      if (currentPage < totalPages) renderSongList(currentPage + 1);
+    };
+
+    // 使用 pageshow 监听
+    window.addEventListener('pageshow', (event) => {
+      // 这里的 logic 保证了从详情页“返回”时，无论页面是否来自 bfcache，都执行数据刷新
+      renderSongList(currentPage);
+    });
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>专辑详情</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        /* 保留你原有样式，此处省略（按你要求不写样式） */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background-color: #f5f2eb;
+            color: #3a362f;
+            line-height: 1.6;
+            padding-bottom: 50px;
+        }
+
+        .section-jieshao {
+            display: flex;
+            gap: 30px;
+            padding: 40px 20px;
+            align-items: flex-start;
+            max-width: 1200px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+
+        .box1 {
+            width: 300px;
+            height: 300px;
+            overflow: hidden;
+            flex-shrink: 0;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(139, 110, 78, 0.2);
+            transition: transform 0.3s ease;
+            margin: 0 auto;
+        }
+
+        .box1:hover {
+            transform: translateY(-5px) scale(1.02);
+        }
+
+        .box1 img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 12px;
+        }
+
+        .album-info {
+            flex: 1;
+            min-width: 300px;
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(139, 110, 78, 0.1);
+        }
+
+        .album-info p {
+            font-size: 17px;
+            margin-bottom: 15px;
+        }
+
+        .album-info #album_detail {
+            font-weight: 600;
+            color: #8b6e4e;
+            font-size: 18px;
+        }
+
+        .section-xijie {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .section-xijie ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 17px;
+            background-color: #fff;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(139, 110, 78, 0.1);
+        }
+
+        .section-xijie li {
+            display: flex;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: background-color 0.2s ease;
+        }
+
+        .section-xijie li:hover {
+            background-color: #f8f5ef;
+        }
+
+        .section-xijie li::before {
+            content: attr(data-label);
+            font-weight: 600;
+            color: #8b6e4e;
+            margin-right: 10px;
+            min-width: 80px;
+        }
+
+        @media (max-width: 768px) {
+            .section-jieshao {
+                padding: 20px 15px;
+                gap: 20px;
+            }
+
+            .box1 {
+                width: 250px;
+                height: 250px;
+                margin: 0 auto;
+            }
+
+            .album-info, .section-xijie ul {
+                padding: 20px;
+            }
+
+            .section-xijie li {
+                font-size: 16px;
+            }
+        }
+
+        /* 加载/错误提示样式 */
+        .tips {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #8b6e4e;
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载/错误提示容器 -->
+    <div class="tips" id="tips">正在加载专辑数据...</div>
+
+    <!-- 专辑内容容器（初始隐藏） -->
+    <section class="section-jieshao" id="albumContent" style="display: none;">
+        <div class="box1">
+            <img id="cover_url" src="images/IMG_20251227_165949.jpg" alt="专辑封面">
+        </div>
+        <div class="album-info">
+            <p id="album_detail">专辑介绍：这是一张充满复古质感的音乐专辑，融合了民谣与流行元素，每一首曲目都承载着创作者的细腻情感，记录了一段难忘的创作旅程。</p>
+            <p id="creation_background">创作背景：本专辑诞生于2025年的深秋，创作者在旅行途中收集灵感，结合自身的生活经历，耗时3个月完成了全部曲目创作。</p>
+        </div>
+    </section>
+
+    <section class="section-xijie" id="detailContent" style="display: none;">
+        <ul>
+            <li id="name_cn" data-label="中文名称">时光回响</li>
+            <li id="name_en" data-label="英文名称">Echo of Time</li>
+            <li id="release_date" data-label="发行日期">2025-12-27</li>
+            <li id="awards" data-label="所获奖项">2025年度最佳原创专辑提名</li>
+            <li id="language" data-label="语言类型">国语/英语</li>
+            <li id="record_label" data-label="唱片公司">拾光音乐</li>
+        </ul>
+    </section>
+    <script>
+        // 1. 获取URL中的专辑ID参数
+        function getUrlParam(name) {
+            const searchParams = new URLSearchParams(window.location.search);
+            return searchParams.get(name);
+        }
+
+        // 2. 页面加载后请求并渲染数据
+        document.addEventListener('DOMContentLoaded', async () => {
+            const albumId = getUrlParam('albumId');
+            const tipsEl = document.getElementById('tips');
+            
+            // 校验参数是否存在
+            if (!albumId) {
+                tipsEl.textContent = '未找到专辑ID，请从首页点击专辑进入';
+                return;
+            }
+
+            try {
+                // 3. 请求后端专辑数据
+                const response = await axios.get(`http://localhost:3000/api/albums/${albumId}`);
+                
+                // 4. 校验响应数据
+                if (response.data.code !== 200) {
+                    throw new Error(response.data.msg || '数据请求失败');
+                }
+                const album = response.data.data;
+
+                // 5. 渲染数据到页面
+                // 封面图
+                if (album.cover_url) {
+                    document.getElementById('cover_url').src = album.cover_url;
+                    document.getElementById('cover_url').alt = `${album.name_cn} 专辑封面`;
+                }
+                // 专辑介绍/创作背景
+                document.getElementById('album_detail').textContent = `专辑介绍：${album.album_detail}`;
+                document.getElementById('creation_background').textContent = `创作背景：${album.creation_background}`;
+                // 基础信息
+                document.getElementById('name_cn').textContent = album.name_cn;
+                document.getElementById('name_en').textContent = album.name_en;
+                document.getElementById('release_date').textContent = album.release_date;
+                document.getElementById('awards').textContent = album.awards.join('、');
+                document.getElementById('language').textContent = album.language;
+                document.getElementById('record_label').textContent = album.record_label;
+
+                // 6. 隐藏提示，显示内容
+                tipsEl.style.display = 'none';
+                document.getElementById('albumContent').style.display = 'flex';
+                document.getElementById('detailContent').style.display = 'block';
+
+            } catch (error) {
+                // 错误处理
+                tipsEl.textContent = `加载失败：${error.message}（请检查后端服务是否启动）`;
+                console.error('请求失败：', error);
+            }
+        });
+    </script>
+</body>
+</html>

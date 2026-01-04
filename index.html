@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>陶喆</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* 仅新增/调整歌曲列表相关样式（和列表页对齐），不修改任何原有样式 */
+        /* 歌曲行点击样式 */
+        .song-item {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .song-item:hover {
+            background-color: #f8f9fa;
+        }
+        /* 加载提示样式 */
+        .tip-row {
+            text-align: center;
+            padding: 2rem !important;
+            color: #64748b;
+            font-style: italic;
+        }
+        /* 评分徽章样式（和列表页一致） */
+        .score-badge {
+            display: inline-flex;
+            align-items: center;
+            font-weight: 700;
+            color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+        .rating-count {
+            color: #64748b;
+            font-size: 0.75rem;
+            margin-left: 6px;
+            font-weight: normal;
+        }
+        /* 适配原有表格容器宽度 */
+        .songs-table-container {
+            width: 100%;
+            max-width: 1160px;
+        }
+        .horizontal-only-table {
+            width: 100%;
+        }
+        /* 响应式隐藏发行时间（和列表页一致） */
+        @media (max-width: 640px) {
+            .horizontal-only-table th:nth-child(3), 
+            .horizontal-only-table td:nth-child(3) { 
+                display: none; 
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <ul>
+            <li><a href="index.html">首页</a></li>
+            <li><a href="about.html">专辑</a></li>
+            <li><a href="songs-list.html">评分</a></li>
+        </ul>
+        <div class="auth-buttons">
+            <a href="login.html" class="register-btn">登录</a>
+        </div>
+    </nav>
+
+    <section class="section-zhuanji">
+        <h2 style="font-size: 30px">专  辑</h2>
+        <ul class="album-list">
+            <!-- 专辑列表保留原有逻辑 -->
+            <li data-album-id="tao_zhe_2002">
+                <img src="images\1e47e0bee4f340d27f2cb5971ab24a7a_750.png" alt="" class="card">
+                <div><p>黑色柳丁</p></div>
+            </li>
+            <li data-album-id="tao_zhe_2005">
+                <img src="images\AlbumCover_2772074981766833247049.jpg" alt="" class="card">
+                <div><p>太平盛世</p></div>
+            </li>
+            <li data-album-id="tao_zhe_2009">
+                <img src="images\e96f1754f3571b046c5175e2648b0671_750.png" alt="" class="card">
+                <div><p>69乐章</p></div>
+            </li>
+            <li data-album-id="tao_zhe_2006">
+                <img src="images\AlbumCover_16489345041766833225871.jpg" alt="" class="card">
+                <div><p>太美丽</p></div>
+            </li>
+            <li data-album-id="tao_zhe_1999">
+                <img src="images\d0a6cf34ab3966c5fabf7075fe04c565_750.png" alt="" class="card">
+                <div><p>I'm ok</p></div>
+            </li>
+            <li data-album-id="tao_zhe_1997">
+                <img src="images\T002R300x300M000003ROVwj4PqLPa_4.webp" alt="" class="card">
+                <div><p>陶喆同名专辑</p></div>
+            </li>
+            <li data-album-id="tao_zhe_2013">
+                <img src="images\AlbumCover_-13858336131767091595255.jpg" alt="" class="card">
+                <div><p>再见你好吗</p></div>
+            </li>
+            <li data-album-id="tao_zhe_2025">
+                <img src="images\IMG_20251230_184844.jpg" alt="" class="card">
+                <div><p>STUPID POP SONGS</p></div>
+            </li>
+        </ul>
+    </section>
+
+    <section class="section-remengequ">
+        <div style="padding: 20px;"><h2 style="font-size: 30px;">热门歌曲</h2></div>
+        <div class="songs-table-container">
+            <!-- 仅修改表格列结构，和列表页一致 -->
+            <table class="songs-table horizontal-only-table">
+                <thead>
+                    <tr>
+                        <th>歌名</th>
+                        <th>专辑</th>
+                        <th>发行时间</th>
+                        <th>评分详情</th>
+                    </tr>
+                </thead>
+                <tbody id="hotSongsList">
+                    <!-- 动态渲染区域 -->
+                    <tr><td colspan="4" class="tip-row">正在加载热门歌曲...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div> <a href="songs-list.html" style="color: black;">点击查看更多歌曲</a>  </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        // 防XSS转义函数
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        // 专辑卡片点击跳转（保留原有逻辑）
+        const zhuanji = document.querySelectorAll('.album-list li ');
+        zhuanji.forEach(a => a.classList.add('lyric-line'));
+        document.querySelectorAll('.album-list li').forEach(li => {
+            li.addEventListener('click', function() {
+                const albumId = this.getAttribute('data-album-id');
+                window.location.href = `album-details.html?albumId=${albumId}`;
+            });
+        });
+
+        // 动态加载热门歌曲（仅修改：1. pageSize=10 2. 渲染结构和列表页一致 3. 去掉我的评分列）
+        async function loadHotSongs() {
+            try {
+                const hotSongsListEl = document.getElementById('hotSongsList');
+                
+                // 请求后端整合接口（第一页，每页10条）
+                const response = await axios.get('http://localhost:3000/api/all-resources/sort-by-rating', {
+                    params: { 
+                        page: 1, 
+                        pageSize: 10, // 仅显示前10首
+                        _t: Date.now() // 防止缓存
+                    },
+                    withCredentials: true,
+                    timeout: 10000
+                });
+
+                const result = response.data;
+                if (result.code !== 200) {
+                    hotSongsListEl.innerHTML = `<tr><td colspan="4" class="tip-row">加载失败：${escapeHtml(result.msg || '未知错误')}</td></tr>`;
+                    return;
+                }
+
+                const { resources } = result.data;
+                if (resources.length === 0) {
+                    hotSongsListEl.innerHTML = `<tr><td colspan="4" class="tip-row">暂无热门歌曲数据</td></tr>`;
+                    return;
+                }
+
+                // 动态渲染歌曲列表（和列表页结构一致）
+                hotSongsListEl.innerHTML = '';
+                resources.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'song-item'; // 新增类名，适配悬停样式
+                    tr.dataset.songId = item.id; // 绑定歌曲ID
+                    tr.dataset.type = item.type; // 绑定类型（song/single）
+
+                    // 渲染行内容（和列表页完全一致，去掉我的评分列）
+                    tr.innerHTML = `
+                        <td class="song-name">${escapeHtml(item.name_cn)}</td>
+                        <td style="color: #64748b">${escapeHtml(item.album_name || '单曲/未知')}</td>
+                        <td style="color: #64748b">${escapeHtml(item.release_date || '—')}</td>
+                        <td>
+                            <span class="score-badge">${item.averageScore || '0.0'}</span>
+                            <span class="rating-count">${item.ratingCount || 0} 评分</span>
+                        </td>
+                    `;
+
+                    // 歌曲行点击跳转（保留原有逻辑）
+                    tr.addEventListener('click', function() {
+                        const songId = this.dataset.songId;
+                        const type = this.dataset.type;
+                        if (type === 'song') {
+                            window.location.href = `songs-details.html?songId=${encodeURIComponent(songId)}`;
+                        } else {
+                            window.location.href = `single-details.html?singleId=${encodeURIComponent(songId)}`;
+                        }
+                    });
+
+                    hotSongsListEl.appendChild(tr);
+                });
+
+            } catch (error) {
+                const hotSongsListEl = document.getElementById('hotSongsList');
+                let errorMsg = '网络连接异常';
+                if (error.response) {
+                    errorMsg = `服务器错误 (${error.response.status})`;
+                    // 404特殊提示
+                    if (error.response.status === 404) {
+                        errorMsg = '接口不存在，请检查后端是否启动并配置正确接口';
+                    }
+                } else if (error.request) {
+                    errorMsg = '无法连接到后端服务，请检查后端是否启动（端口3000）';
+                }
+                hotSongsListEl.innerHTML = `<tr><td colspan="4" class="tip-row">${escapeHtml(errorMsg)}</td></tr>`;
+                console.error('加载热门歌曲失败：', error);
+            }
+        }
+
+        // 页面加载时执行
+        window.onload = function() {
+            loadHotSongs();
+
+            // 原有评分逻辑（保留，不修改）
+            document.querySelectorAll('.rating-container').forEach(container => {
+                const scores = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5];
+                const songName = container.dataset.song;
+                let ratingHtml = '';
+
+                scores.forEach(score => {
+                    ratingHtml += `
+                        <input type="radio" name="rating-${songName}" id="star-${songName}-${score}" value="${score}">
+                        <label for="star-${songName}-${score}">★</label>
+                    `;
+                });
+                container.innerHTML = ratingHtml;
+
+                container.querySelectorAll('input').forEach(input => {
+                    input.addEventListener('change', () => {
+                        const score = input.value;
+                        const scoreDisplay = container.nextElementSibling;
+                        scoreDisplay.textContent = `${score} 星`;
+                    });
+                });
+            });
+        };
+
+        // 页面返回时刷新数据（新增，和列表页一致）
+        window.addEventListener('pageshow', (event) => {
+            loadHotSongs();
+        });
+    </script>
+</body>
+</html>

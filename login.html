@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>陶喆专辑评分 - 登录/注册</title>
+    <!-- 引入axios CDN -->
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", Arial, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: #f5f5f5;
+        }
+
+        .auth-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        /* 登录/注册面板通用样式 */
+        .auth-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 40px 30px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 注册面板默认隐藏 */
+        .register-panel {
+            display: none;
+        }
+
+        /* 登录成功面板（默认隐藏） */
+        .success-panel {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 40px 30px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+            text-align: center;
+        }
+
+        .success-panel h2 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .success-panel p {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .success-panel .go-home-btn {
+            width: 100%;
+            padding: 14px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .auth-panel h2 {
+            margin-bottom: 30px;
+            color: #333;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .auth-panel form {
+            width: 100%;
+        }
+
+        .auth-panel .form-item {
+            margin-bottom: 20px;
+        }
+
+        .auth-panel label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 15px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .auth-panel input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+
+        /* 输入框错误样式 */
+        .auth-panel input.error {
+            border-color: #ff4444;
+            outline: none;
+        }
+
+        .error-tip {
+            color: #ff4444;
+            font-size: 12px;
+            margin-top: 6px;
+            display: none;
+            line-height: 1.4;
+        }
+
+        .auth-panel button {
+            width: 100%;
+            padding: 14px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+
+        .auth-panel button:hover {
+            background-color: #45a049;
+        }
+
+        .auth-panel button:active {
+            background-color: #3d8b40;
+        }
+
+        .auth-panel .switch-panel {
+            margin-top: 20px;
+            font-size: 14px;
+            text-align: center;
+            color: #666;
+        }
+
+        .auth-panel .switch-panel a {
+            color: #4CAF50;
+            text-decoration: none;
+            font-weight: 500;
+            margin-left: 5px;
+        }
+
+        .auth-panel .switch-panel a:hover {
+            text-decoration: underline;
+        }
+
+        /* 登录状态提示 */
+        .login-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: #fff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .login-status span {
+            color: #333;
+            font-size: 14px;
+        }
+
+        .login-status button {
+            padding: 6px 12px;
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .login-status button:hover {
+            background-color: #ff3333;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录状态提示（已登录时显示） -->
+    <div class="login-status" id="loginStatus" style="display: none;">
+        <span id="currentUserName"></span>
+        <button id="logoutBtn">退出登录</button>
+    </div>
+
+    <section class="auth-container">
+        <!-- 登录成功面板（新增：避免页面空白） -->
+        <div class="success-panel" id="successPanel">
+            <h2>登录成功！</h2>
+            <p id="welcomeText"></p>
+            <button class="go-home-btn" id="goHomeBtn">前往专辑评分首页</button>
+            <button class="go-home-btn" style="background-color: #666; margin-top: 15px;" id="showLoginPanelBtn">返回登录面板</button>
+        </div>
+
+        <!-- 登录面板（默认显示） -->
+        <div class="auth-panel login-panel" id="normalLoginPanel">
+            <h2>用户登录</h2>
+            <form id="loginForm">
+                <div class="form-item">
+                    <label for="loginUsername">用户名</label>
+                    <input type="text" id="loginUsername" name="loginUsername" placeholder="请输入用户名">
+                    <div class="error-tip" id="loginUserTip">请输入用户名</div>
+                </div>
+                
+                <div class="form-item">
+                    <label for="loginPassword">密码</label>
+                    <input type="password" id="loginPassword" name="loginPassword" placeholder="请输入密码">
+                    <div class="error-tip" id="loginPwdTip">请输入密码</div>
+                </div>
+                
+                <button type="button" id="loginBtn">登录</button>
+                <div class="switch-panel">
+                    没有账号？<a href="javascript:;" id="toRegister">立即注册</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- 注册面板（默认隐藏） -->
+        <div class="auth-panel register-panel" id="normalRegisterPanel">
+            <h2>用户注册</h2>
+            <form id="registerForm">
+                <div class="form-item">
+                    <label for="regUsername">用户名</label>
+                    <input type="text" id="regUsername" name="regUsername" placeholder="至少3位字符">
+                    <div class="error-tip" id="regUserTip">请输入用户名（至少3位）</div>
+                </div>
+                
+                <div class="form-item">
+                    <label for="regPassword">密码</label>
+                    <input type="password" id="regPassword" name="regPassword" placeholder="至少6位字符">
+                    <div class="error-tip" id="regPwdTip">请输入密码（至少6位）</div>
+                </div>
+                
+                <div class="form-item">
+                    <label for="regConfirmPwd">确认密码</label>
+                    <input type="password" id="regConfirmPwd" name="regConfirmPwd" placeholder="再次输入密码">
+                    <div class="error-tip" id="regConfirmTip">两次密码不一致</div>
+                </div>
+                
+                <button type="button" id="registerBtn">注册</button>
+                <div class="switch-panel">
+                    已有账号？<a href="javascript:;" id="toLogin">立即登录</a>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <script>
+        // 后端接口基础地址
+        const BASE_URL = 'http://localhost:3000';
+
+        // ==================== 核心工具函数 ====================
+        // 1. 显示错误提示
+        const showError = (elem, tipElem, text) => {
+            elem.classList.add('error');
+            tipElem.textContent = text;
+            tipElem.style.display = 'block';
+        };
+
+        // 2. 隐藏错误提示
+        const hideError = (elem, tipElem) => {
+            elem.classList.remove('error');
+            tipElem.style.display = 'none';
+        };
+
+        // 3. 封装POST请求
+        const requestPost = async (url, data, needToken = false) => {
+            try {
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                // 如果需要token，自动添加到请求头
+                if (needToken) {
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                        alert('登录已过期，请重新登录');
+                        logout(); // 清空登录态
+                        return { code: 401, msg: '登录已过期' };
+                    }
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const res = await axios.post(`${BASE_URL}${url}`, data, {
+                    headers: headers,
+                    withCredentials: false // 对应原fetch移除credentials: 'include'
+                });
+                
+                // 直接返回axios响应的data（与原fetch解析后的json结构一致）
+                return res.data;
+            } catch (err) {
+                if (err.message.includes('Network Error')) {
+                    alert('网络错误，请检查：\n1. 后端服务是否启动\n2. 后端端口是否为3000\n3. 后端CORS配置是否允许当前前端地址');
+                } else if (err.response) {
+                    // 有响应但状态码非2xx
+                    alert(`请求失败：${err.response.status}`);
+                } else {
+                    alert('请求失败：' + err.message);
+                }
+                return { code: 500, msg: '网络请求失败' };
+            }
+        };
+
+        // 4. 封装GET请求（替换为axios，用于获取用户信息等）
+        const requestGet = async (url) => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    return { code: 401, msg: '未登录' };
+                }
+
+                const res = await axios.get(`${BASE_URL}${url}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    withCredentials: false
+                });
+
+                // 直接返回axios响应的data
+                return res.data;
+            } catch (err) {
+                if (err.response) {
+                    alert(`请求失败：${err.response.status}`);
+                } else if (err.message.includes('Network Error')) {
+                    alert('网络错误，请检查后端服务是否正常');
+                } else {
+                    alert('请求失败：' + err.message);
+                }
+                return { code: 500, msg: '网络请求失败' };
+            }
+        };
+
+        // 5. 检查登录状态（优化：显示成功面板，避免空白）
+        const checkLoginStatus = () => {
+            const currentUser = localStorage.getItem('currentUser');
+            const token = localStorage.getItem('token');
+            
+            if (currentUser && token) {
+                // 显示登录状态提示
+                document.getElementById('loginStatus').style.display = 'flex';
+                document.getElementById('currentUserName').textContent = `当前登录：${currentUser}`;
+                
+                // 隐藏登录/注册面板，显示成功面板（核心：避免空白）
+                document.getElementById('normalLoginPanel').style.display = 'none';
+                document.getElementById('normalRegisterPanel').style.display = 'none';
+                document.getElementById('successPanel').style.display = 'flex';
+                document.getElementById('welcomeText').textContent = `欢迎回来，${currentUser}！`;
+                
+                // 验证token是否有效
+                requestGet('/api/user/info').then(res => {
+                    if (res.code !== 200) {
+                        logout(); // token无效，退出登录
+                    }
+                });
+            } else {
+                // 未登录：显示登录面板，隐藏成功面板
+                document.getElementById('loginStatus').style.display = 'none';
+                document.getElementById('successPanel').style.display = 'none';
+                document.getElementById('normalLoginPanel').style.display = 'flex';
+            }
+        };
+
+        // 6. 退出登录
+        const logout = () => {
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('token');
+            checkLoginStatus(); // 刷新状态
+            alert('已成功退出登录');
+        };
+
+        // ==================== 面板切换逻辑（保留原有逻辑） ====================
+        const loginPanel = document.querySelector('.login-panel');
+        const registerPanel = document.querySelector('.register-panel');
+        const toRegister = document.getElementById('toRegister');
+        const toLogin = document.getElementById('toLogin');
+
+        // 切换到注册面板
+        toRegister.addEventListener('click', () => {
+            loginPanel.style.display = 'none';
+            registerPanel.style.display = 'flex';
+            // 清空登录表单
+            document.getElementById('loginForm').reset();
+            hideError(document.getElementById('loginUsername'), document.getElementById('loginUserTip'));
+            hideError(document.getElementById('loginPassword'), document.getElementById('loginPwdTip'));
+        });
+
+        // 切换到登录面板
+        toLogin.addEventListener('click', () => {
+            registerPanel.style.display = 'none';
+            loginPanel.style.display = 'flex';
+            // 清空注册表单
+            document.getElementById('registerForm').reset();
+            hideError(document.getElementById('regUsername'), document.getElementById('regUserTip'));
+            hideError(document.getElementById('regPassword'), document.getElementById('regPwdTip'));
+            hideError(document.getElementById('regConfirmPwd'), document.getElementById('regConfirmTip'));
+        });
+
+        // ==================== 登录逻辑（对接后端接口，保留原有逻辑） ====================
+        const loginBtn = document.getElementById('loginBtn');
+        const loginUsername = document.getElementById('loginUsername');
+        const loginPassword = document.getElementById('loginPassword');
+        const loginUserTip = document.getElementById('loginUserTip');
+        const loginPwdTip = document.getElementById('loginPwdTip');
+
+        loginBtn.addEventListener('click', async () => {
+            let isValid = true;
+            const username = loginUsername.value.trim();
+            const password = loginPassword.value.trim();
+
+            // 前端基础校验
+            if (!username) {
+                showError(loginUsername, loginUserTip, '请输入用户名');
+                isValid = false;
+            } else {
+                hideError(loginUsername, loginUserTip);
+            }
+
+            if (!password) {
+                showError(loginPassword, loginPwdTip, '请输入密码');
+                isValid = false;
+            } else {
+                hideError(loginPassword, loginPwdTip);
+            }
+
+            // 前端校验通过，调用登录接口
+            if (isValid) {
+                const result = await requestPost('/api/user/login', {
+                    username,
+                    password
+                });
+
+                if (result.code === 200) {
+                    alert('登录成功！');
+                    // 存储登录状态（用户名+token）
+                    localStorage.setItem('currentUser', username);
+                    localStorage.setItem('token', result.data.token); // 存储后端返回的token
+                    // 清空表单
+                    document.getElementById('loginForm').reset();
+                    // 检查并更新登录状态
+                    checkLoginStatus();
+                    // 可选：跳转到首页
+                    // window.location.href = '/index.html';
+                } else {
+                    // 后端返回的错误提示
+                    if (result.msg.includes('用户名不存在')) {
+                        showError(loginUsername, loginUserTip, result.msg);
+                    } else if (result.msg.includes('密码错误')) {
+                        showError(loginPassword, loginPwdTip, result.msg);
+                    } else if (result.msg.includes('不能为空')) {
+                        alert(result.msg);
+                    } else {
+                        alert('登录失败：' + result.msg);
+                    }
+                }
+            }
+        });
+
+        // ==================== 注册逻辑（对接后端接口，保留原有逻辑） ====================
+        const registerBtn = document.getElementById('registerBtn');
+        const regUsername = document.getElementById('regUsername');
+        const regPassword = document.getElementById('regPassword');
+        const regConfirmPwd = document.getElementById('regConfirmPwd');
+        const regUserTip = document.getElementById('regUserTip');
+        const regPwdTip = document.getElementById('regPwdTip');
+        const regConfirmTip = document.getElementById('regConfirmTip');
+
+        registerBtn.addEventListener('click', async () => {
+            let isValid = true;
+            const username = regUsername.value.trim();
+            const password = regPassword.value.trim();
+            const confirmPwd = regConfirmPwd.value.trim();
+
+            // 前端基础校验
+            if (!username) {
+                showError(regUsername, regUserTip, '请输入用户名');
+                isValid = false;
+            } else if (username.length < 3) {
+                showError(regUsername, regUserTip, '用户名至少3位');
+                isValid = false;
+            } else {
+                hideError(regUsername, regUserTip);
+            }
+
+            if (!password) {
+                showError(regPassword, regPwdTip, '请输入密码');
+                isValid = false;
+            } else if (password.length < 6) {
+                showError(regPassword, regPwdTip, '密码至少6位');
+                isValid = false;
+            } else {
+                hideError(regPassword, regPwdTip);
+            }
+
+            if (confirmPwd !== password) {
+                showError(regConfirmPwd, regConfirmTip, '两次密码不一致');
+                isValid = false;
+            } else if (!confirmPwd) {
+                showError(regConfirmPwd, regConfirmTip, '请确认密码');
+                isValid = false;
+            } else {
+                hideError(regConfirmPwd, regConfirmTip);
+            }
+
+            // 前端校验通过，调用注册接口
+            if (isValid) {
+                const result = await requestPost('/api/user/register', {
+                    username,
+                    password
+                });
+
+                if (result.code === 200) {
+                    alert('注册成功！即将跳转到登录页');
+                    // 切换回登录面板
+                    toLogin.click();
+                    // 自动填充用户名到登录框
+                    loginUsername.value = username;
+                } else {
+                    // 后端返回的错误提示
+                    if (result.msg.includes('用户名已存在')) {
+                        showError(regUsername, regUserTip, result.msg);
+                    } else {
+                        alert('注册失败：' + result.msg);
+                    }
+                }
+            }
+        });
+
+        // ==================== 输入框实时清除错误提示（保留原有逻辑） ====================
+        // 登录输入框
+        loginUsername.addEventListener('input', () => hideError(loginUsername, loginUserTip));
+        loginPassword.addEventListener('input', () => hideError(loginPassword, loginPwdTip));
+
+        // 注册输入框
+        regUsername.addEventListener('input', () => hideError(regUsername, regUserTip));
+        regPassword.addEventListener('input', () => hideError(regPassword, regPwdTip));
+        regConfirmPwd.addEventListener('input', () => hideError(regConfirmPwd, regConfirmTip));
+
+        // ==================== 新增：成功面板按钮逻辑 ====================
+        // 前往首页按钮（可修改跳转地址）
+        document.getElementById('goHomeBtn').addEventListener('click', () => {
+            // 替换为你的首页地址，比如 index.html
+            window.location.href = '/index.html'; 
+        });
+
+        // 返回登录面板按钮
+        document.getElementById('showLoginPanelBtn').addEventListener('click', () => {
+            document.getElementById('successPanel').style.display = 'none';
+            document.getElementById('normalLoginPanel').style.display = 'flex';
+        });
+
+        // ==================== 退出登录逻辑（保留原有逻辑） ====================
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+
+        // ==================== 页面加载时检查登录状态（保留原有逻辑） ====================
+        window.onload = checkLoginStatus;
+    </script>
+</body>
+</html>

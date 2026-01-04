@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>歌曲详情 - 音乐收藏</title>
+  <style>
+    /* 定义现代色彩变量 */
+    :root {
+      --primary: #6366f1;         /* 现代靛蓝 */
+      --primary-hover: #4f46e5;
+      --bg-body: #fbfcfd;         /* 极浅灰蓝背景 */
+      --bg-card: #ffffff;
+      --text-main: #1e293b;       /* 深石板灰 */
+      --text-muted: #64748b;      /* 中性灰 */
+      --border-color: #f1f5f9;    /* 超浅边框 */
+      --accent-orange: #f59e0b;   /* 柔和橙色 */
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --comment-bg: #fafafa;      /* 评论背景色 */
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      padding: 2rem 1rem;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+      background: var(--bg-card);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(226, 232, 240, 0.5);
+      overflow: hidden;
+    }
+
+    /* 顶部导航 */
+    .header {
+      padding: 1.25rem 2rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+    }
+
+    .back-btn {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .back-btn:hover {
+      color: var(--primary);
+    }
+
+    /* 歌曲信息区 */
+    .song-content {
+      padding: 2.5rem;
+    }
+
+    .song-header {
+      margin-bottom: 2rem;
+    }
+
+    .song-title {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.025em;
+    }
+
+    .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .album-badge {
+      background: rgba(99, 102, 241, 0.1);
+      color: var(--primary);
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .release-date {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    /* 评分卡片区 */
+    .score-card {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .score-info h3 {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .score-display {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .avg-num {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--accent-orange);
+    }
+
+    .count-text {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* 互动打分 */
+    .rating-action {
+      text-align: right;
+    }
+
+    .star-group {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      justify-content: flex-end;
+    }
+
+    .star {
+      font-size: 1.75rem;
+      color: #e2e8f0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .star.active, .star.hover {
+      color: var(--accent-orange);
+      transform: scale(1.1);
+    }
+
+    .submit-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .rating-tip {
+      font-size: 0.75rem;
+      margin-top: 8px;
+      color: var(--text-muted);
+    }
+
+    /* 详细参数 */
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 2rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .detail-item label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .detail-item p {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    /* ===================== 新增：评论区样式 ===================== */
+    /* 评论区标题 */
+    .comments-section {
+      margin-top: 3rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 2rem;
+    }
+
+    .comments-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .comments-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .comments-count {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    /* 发布评论区 */
+    .comment-form {
+      background: var(--comment-bg);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .comment-input-wrapper {
+      margin-bottom: 1rem;
+    }
+
+    .comment-input {
+      width: 100%;
+      min-height: 80px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.95rem;
+      resize: vertical;
+      background: white;
+      transition: border-color 0.2s;
+    }
+
+    .comment-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+    }
+
+    .comment-input::placeholder {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .comment-form-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .comment-length-tip {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .comment-submit-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .comment-submit-btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .comment-submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .comment-login-tip {
+      text-align: center;
+      padding: 1rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .comment-login-tip a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    /* 评论列表 */
+    .comments-list {
+      margin-bottom: 2rem;
+    }
+
+    .comment-item {
+      padding: 1.25rem 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .comment-item:last-child {
+      border-bottom: none;
+    }
+
+    .comment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .comment-username {
+      font-weight: 600;
+      color: var(--text-main);
+      font-size: 0.95rem;
+    }
+
+    .comment-time {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .comment-content {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--text-main);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* 空评论状态 */
+    .empty-comments {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+
+    .empty-comments-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #e2e8f0;
+    }
+
+    /* 评论分页 */
+    .comments-pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2rem;
+    }
+
+    .page-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: white;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .page-btn:hover:not(:disabled) {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .page-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .page-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    /* 评论加载状态 */
+    .comments-loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+    }
+    /* ===================== 评论区样式结束 ===================== */
+
+    /* 加载中状态 */
+    .loading-overlay {
+      padding: 5rem;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    #scoreLoading {
+      font-size: 0.75rem;
+      color: var(--primary);
+      margin-left: 10px;
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .score-card { flex-direction: column; text-align: center; gap: 1.5rem; }
+      .rating-action { text-align: center; }
+      .star-group { justify-content: center; }
+      .song-content { padding: 1.5rem; }
+      .comments-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="songs-list.html" class="back-btn">← 返回列表</a>
+    </div>
+
+    <div id="loading" class="loading-overlay">正在获取歌曲信息...</div>
+
+    <div id="songDetail" class="song-content" style="display: none;">
+      <div class="song-header">
+        <h1 class="song-title" id="songName">加载中...</h1>
+        <div class="meta-row">
+          <span class="album-badge" id="albumName">-</span>
+          <span class="release-date" id="releaseDate">发行时间：-</span>
+        </div>
+      </div>
+
+      <div class="score-card">
+        <div class="score-info">
+          <h3>听众评分</h3>
+          <div class="score-display">
+            <span class="avg-num" id="averageScore">0.0</span>
+            <span class="count-text" id="ratingCount">0 人参与</span>
+            <span id="scoreLoading">同步中...</span>
+          </div>
+        </div>
+
+        <div class="rating-action">
+          <div class="star-group" id="starRating">
+            <span class="star" data-score="1">★</span>
+            <span class="star" data-score="2">★</span>
+            <span class="star" data-score="3">★</span>
+            <span class="star" data-score="4">★</span>
+            <span class="star" data-score="5">★</span>
+          </div>
+          <button class="submit-btn" id="ratingSubmit" disabled>提交我的评分</button>
+          <div class="rating-tip" id="ratingTip">登录后即可参与打分</div>
+        </div>
+      </div>
+
+      <div class="details-grid">
+        <div class="detail-item">
+          <label>作词</label>
+          <p id="lyricist">-</p>
+        </div>
+        <div class="detail-item">
+          <label>作曲</label>
+          <p id="composer">-</p>
+        </div>
+        <div class="detail-item">
+          <label>编曲</label>
+          <p id="arranger">-</p>
+        </div>
+        <div class="detail-item">
+          <label>时长</label>
+          <p id="duration">-</p>
+        </div>
+      </div>
+
+      <!-- ===================== 新增：评论区HTML ===================== -->
+      <div class="comments-section">
+        <div class="comments-header">
+          <h2 class="comments-title">听众评论</h2>
+          <span class="comments-count" id="commentsTotalCount">0 条评论</span>
+        </div>
+
+        <!-- 发布评论区域 -->
+        <div id="commentFormContainer" class="comment-form">
+          <div id="commentLoginTip" class="comment-login-tip">
+            <a href="login.html">请登录</a> 后发表你的看法
+          </div>
+          <div id="commentForm" style="display: none;">
+            <div class="comment-input-wrapper">
+              <textarea 
+                class="comment-input" 
+                id="commentContent" 
+                placeholder="分享你的听后感（1-500字）..."
+                maxlength="500"></textarea>
+            </div>
+            <div class="comment-form-footer">
+              <span class="comment-length-tip" id="commentLengthTip">0/500</span>
+              <button class="comment-submit-btn" id="commentSubmitBtn" disabled>发布评论</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 评论列表 -->
+        <div id="commentsLoading" class="comments-loading">加载评论中...</div>
+        <div id="emptyComments" class="empty-comments" style="display: none;">
+          <div class="empty-comments-icon">💬</div>
+          <p>暂无评论，快来抢沙发吧～</p>
+        </div>
+        <div id="commentsList" class="comments-list" style="display: none;"></div>
+
+        <!-- 评论分页 -->
+        <div id="commentsPagination" class="comments-pagination" style="display: none;"></div>
+      </div>
+      <!-- ===================== 评论区HTML结束 ===================== -->
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script>
+    const songId = new URLSearchParams(window.location.search).get('songId');
+    let selectedScore = 0;
+    
+    // 评论相关全局变量
+    let currentCommentPage = 1;
+    const commentPageSize = 20;
+    let totalCommentPages = 0;
+
+    // --- 工具函数：格式化时间 ---
+    function formatCommentTime(timeStr) {
+      const date = new Date(timeStr);
+      const now = new Date();
+      const diff = now - date;
+      
+      // 计算时间差（秒/分/时/天）
+      const seconds = Math.floor(diff / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      if (days > 0) return `${days}天前`;
+      if (hours > 0) return `${hours}小时前`;
+      if (minutes > 0) return `${minutes}分钟前`;
+      return '刚刚';
+    }
+
+    // --- 评分相关函数（原有逻辑保留） ---
+    async function getSongRating() {
+      if (!songId) return;
+      const scoreLoading = document.getElementById('scoreLoading');
+      scoreLoading.style.display = 'inline';
+      
+      try {
+        const res = await axios.get(`http://localhost:3000/api/songs/${songId}/rating/average`, {
+          withCredentials: true
+        });
+        if (res.data.code === 200) {
+          const { averageScore, ratingCount } = res.data.data;
+          document.getElementById('averageScore').textContent = averageScore || '0.0';
+          document.getElementById('ratingCount').textContent = `${ratingCount || 0} 人参与`;
+        }
+      } catch (err) {
+        console.error('获取评分失败:', err);
+      } finally {
+        scoreLoading.style.display = 'none';
+      }
+    }
+
+    async function getUserCurrentRating() {
+      const token = localStorage.getItem('token');
+      if (!token || !songId) return;
+
+      try {
+        const res = await axios.get(`http://localhost:3000/api/user/songs/${songId}/rating`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          withCredentials: true
+        });
+        if (res.data.code === 200 && res.data.data.score) {
+          selectedScore = res.data.data.score;
+          updateStarDisplay(selectedScore);
+          document.getElementById('ratingTip').textContent = `已评分：${selectedScore} 星 (可修改)`;
+          document.getElementById('ratingSubmit').disabled = false;
+        }
+      } catch (err) {
+        // 用户未评分会报404，此处静默处理
+      }
+    }
+
+    function updateStarDisplay(score) {
+      const stars = document.querySelectorAll('.star');
+      stars.forEach(s => {
+        s.classList.toggle('active', parseFloat(s.dataset.score) <= score);
+      });
+    }
+
+    function initRatingSystem() {
+      const stars = document.querySelectorAll('.star');
+      const submitBtn = document.getElementById('ratingSubmit');
+      const tip = document.getElementById('ratingTip');
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        tip.innerHTML = '<a href="login.html" style="color:var(--primary)">请先登录后再评分</a>';
+        return;
+      }
+
+      tip.textContent = "选择星级提交评分";
+
+      stars.forEach(star => {
+        star.addEventListener('mouseenter', () => {
+          const hoverScore = star.dataset.score;
+          stars.forEach(s => s.classList.toggle('hover', s.dataset.score <= hoverScore));
+        });
+
+        star.addEventListener('mouseleave', () => {
+          stars.forEach(s => s.classList.remove('hover'));
+        });
+
+        star.addEventListener('click', () => {
+          selectedScore = star.dataset.score;
+          updateStarDisplay(selectedScore);
+          submitBtn.disabled = false;
+          tip.textContent = `准备提交：${selectedScore} 星`;
+        });
+      });
+
+      submitBtn.onclick = async () => {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "提交中...";
+        
+        try {
+          const res = await axios.post(`http://localhost:3000/api/songs/${songId}/rating`, 
+            { score: selectedScore },
+            { 
+              headers: { 'Authorization': `Bearer ${token}` },
+              withCredentials: true 
+            }
+          );
+
+          if (res.data.code === 200) {
+            tip.textContent = "评分成功！正在同步数据...";
+            // 关键：延迟 500ms 刷新，给后端数据库更新留出缓冲时间
+            setTimeout(async () => {
+              await getSongRating();
+              submitBtn.textContent = "提交我的评分";
+              submitBtn.disabled = false;
+              tip.textContent = `已评分：${selectedScore} 星 (可修改)`;
+            }, 600);
+          }
+        } catch (err) {
+          alert("评分失败，请稍后再试");
+          submitBtn.disabled = false;
+          submitBtn.textContent = "提交我的评分";
+        }
+      };
+    }
+
+    // --- 新增：评论相关函数 ---
+    /**
+     * 加载评论列表
+     * @param {number} page - 页码
+     */
+    async function loadComments(page = 1) {
+      if (!songId) return;
+      
+      // 显示加载状态
+      document.getElementById('commentsLoading').style.display = 'block';
+      document.getElementById('commentsList').style.display = 'none';
+      document.getElementById('emptyComments').style.display = 'none';
+      document.getElementById('commentsPagination').style.display = 'none';
+
+      try {
+        const res = await axios.get(`http://localhost:3000/api/songs/${songId}/comments`, {
+          params: { page, pageSize: commentPageSize },
+          withCredentials: true
+        });
+
+        if (res.data.code === 200) {
+          const { comments, pagination } = res.data.data;
+          const { total, totalPages } = pagination;
+          
+          // 更新全局分页变量
+          currentCommentPage = page;
+          totalCommentPages = totalPages;
+
+          // 更新评论总数显示
+          document.getElementById('commentsTotalCount').textContent = `${total} 条评论`;
+
+          // 处理空评论
+          if (total === 0) {
+            document.getElementById('emptyComments').style.display = 'block';
+            document.getElementById('commentsLoading').style.display = 'none';
+            return;
+          }
+
+          // 渲染评论列表
+          const commentsListEl = document.getElementById('commentsList');
+          commentsListEl.innerHTML = '';
+          
+          comments.forEach(comment => {
+            const commentItem = document.createElement('div');
+            commentItem.className = 'comment-item';
+            commentItem.innerHTML = `
+              <div class="comment-header">
+                <span class="comment-username">${comment.username}</span>
+                <span class="comment-time">${formatCommentTime(comment.createdAt)}</span>
+              </div>
+              <div class="comment-content">${comment.content}</div>
+            `;
+            commentsListEl.appendChild(commentItem);
+          });
+
+          // 显示评论列表和分页
+          commentsListEl.style.display = 'block';
+          renderCommentsPagination();
+        }
+      } catch (err) {
+        console.error('加载评论失败:', err);
+        document.getElementById('commentsLoading').textContent = '加载评论失败，请刷新重试';
+      } finally {
+        document.getElementById('commentsLoading').style.display = 'none';
+      }
+    }
+
+    /**
+     * 渲染评论分页控件
+     */
+    function renderCommentsPagination() {
+      const paginationEl = document.getElementById('commentsPagination');
+      paginationEl.innerHTML = '';                     
+      
+      // 上一页按钮
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'page-btn';
+      prevBtn.textContent = '←';
+      prevBtn.disabled = currentCommentPage === 1;
+      prevBtn.onclick = () => {
+        if (currentCommentPage > 1) {
+          loadComments(currentCommentPage - 1);
+        }
+      };
+      paginationEl.appendChild(prevBtn);
+
+      // 页码按钮（最多显示5个页码）
+      const startPage = Math.max(1, currentCommentPage - 2);
+      const endPage = Math.min(totalCommentPages, startPage + 4);
+      
+      for (let i = startPage; i <= endPage; i++) {
+        const pageBtn = document.createElement('button');
+        pageBtn.className = `page-btn ${i === currentCommentPage ? 'active' : ''}`;
+        pageBtn.textContent = i;
+        pageBtn.onclick = () => loadComments(i);
+        paginationEl.appendChild(pageBtn);
+      }
+
+      // 下一页按钮
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'page-btn';
+      nextBtn.textContent = '→';
+      nextBtn.disabled = currentCommentPage === totalCommentPages;
+      nextBtn.onclick = () => {
+        if (currentCommentPage < totalCommentPages) {
+          loadComments(currentCommentPage + 1);
+        }
+      };
+      paginationEl.appendChild(nextBtn);
+
+      // 显示分页控件
+      paginationEl.style.display = 'flex';
+    }
+
+    /**
+     * 初始化评论发布功能
+     */
+    function initCommentForm() {
+      const token = localStorage.getItem('token');
+      const commentLoginTip = document.getElementById('commentLoginTip');
+      const commentForm = document.getElementById('commentForm');
+      const commentContent = document.getElementById('commentContent');
+      const commentLengthTip = document.getElementById('commentLengthTip');
+      const commentSubmitBtn = document.getElementById('commentSubmitBtn');
+
+      // 未登录：显示登录提示
+      if (!token) {
+        commentLoginTip.style.display = 'block';
+        commentForm.style.display = 'none';
+        return;
+      }
+
+      // 已登录：显示评论输入框
+      commentLoginTip.style.display = 'none';
+      commentForm.style.display = 'block';
+
+      // 监听输入内容变化
+      commentContent.addEventListener('input', () => {
+        const content = commentContent.value.trim();
+        const length = content.length;
+        
+        // 更新字数提示
+        commentLengthTip.textContent = `${length}/500`;
+        
+        // 启用/禁用发布按钮（1-500字）
+        commentSubmitBtn.disabled = length < 1 || length > 500;
+      });
+
+      // 发布评论按钮点击事件
+      commentSubmitBtn.onclick = async () => {
+        const content = commentContent.value.trim();
+        if (!content || content.length < 1 || content.length > 500) return;
+
+        // 禁用按钮，防止重复提交
+        commentSubmitBtn.disabled = true;
+        commentSubmitBtn.textContent = '发布中...';
+
+        try {
+          const res = await axios.post(
+            `http://localhost:3000/api/songs/${songId}/comment`,
+            { content },
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              withCredentials: true
+            }
+          );
+
+          if (res.data.code === 200) {
+            alert('评论发布成功！');
+            // 清空输入框
+            commentContent.value = '';
+            commentLengthTip.textContent = '0/500';
+            // 刷新评论列表（回到第一页）
+            loadComments(1);
+          }
+        } catch (err) {
+          console.error('发布评论失败:', err);
+          alert('评论发布失败，请稍后再试');
+        } finally {
+          // 恢复按钮状态
+          commentSubmitBtn.disabled = false;
+          commentSubmitBtn.textContent = '发布评论';
+        }
+      };
+    }
+
+    // --- 页面加载主函数（原有逻辑+评论初始化） ---
+    async function loadPage() {
+      if (!songId) {
+        window.location.href = 'songs-list.html';
+        return;
+      }
+
+      try {
+        // 获取基础信息
+        const songRes = await axios.get(`http://localhost:3000/api/songs/${songId}`, { withCredentials: true });
+        const song = songRes.data.data;
+        
+        // 获取专辑信息
+        const albumRes = await axios.get(`http://localhost:3000/api/albums/${song.album_id}`, { withCredentials: true });
+        const album = albumRes.data.data;
+
+        // 填充数据
+        document.getElementById('songName').textContent = song.name_cn;
+        document.getElementById('albumName').textContent = album.name_cn;
+        document.getElementById('releaseDate').textContent = `发行时间：${album.release_date || '未知'}`;
+        document.getElementById('lyricist').textContent = song.lyricist || '—';
+        document.getElementById('composer').textContent = song.composer || '—';
+        document.getElementById('arranger').textContent = song.arranger || '—';
+        document.getElementById('duration').textContent = song.duration || '—';
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('songDetail').style.display = 'block';
+
+        // 初始化评分相关
+        await getSongRating();
+        await getUserCurrentRating();
+        initRatingSystem();
+
+        // ===================== 新增：初始化评论功能 =====================
+        // 初始化评论发布表单
+        initCommentForm();
+        // 加载评论列表
+        await loadComments(1);
+
+      } catch (err) {
+        document.getElementById('loading').textContent = "加载失败，请检查网络或歌曲ID是否存在";
+        console.error(err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadPage);
+  </script>
+</body>
+</html>
