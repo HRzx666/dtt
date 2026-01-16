@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人中心 - 陶喆音乐评分系统</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.js"></script>
+  <style>
+    /* 全局变量与基础样式 */
+    :root {
+      --primary-color: #6366f1;
+      --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      --bg-color: #f8fafc;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: "PingFang SC", "Microsoft Yahei", sans-serif; }
+
+    body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; line-height: 1.6; }
+
+    .container { max-width: 1000px; margin: 0 auto; }
+
+    /* 头部导航 */
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .header-title { font-size: 24px; font-weight: 700; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: inline-flex; align-items: center; gap: 6px; }
+    .btn-back { background-color: white; color: var(--text-main); text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .btn-back:hover { transform: translateX(-5px); box-shadow: var(--card-shadow); }
+    .btn-logout { background-color: #fee2e2; color: #ef4444; }
+    .btn-logout:hover { background-color: #ef4444; color: white; }
+
+    /* 用户信息卡片 */
+    .user-card { background: white; padding: 35px; border-radius: 24px; margin-bottom: 30px; display: flex; flex-wrap: wrap; align-items: center; gap: 40px; box-shadow: var(--card-shadow); position: relative; overflow: hidden; }
+
+    /* 头像区域：垂直居中排列 */
+    .avatar-area { display: flex; flex-direction: column; align-items: center; gap: 15px; position: relative; z-index: 1; }
+    .avatar, .avatar-img { width: 110px; height: 110px; border-radius: 50%; border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+    .avatar { background: var(--primary-gradient); color: white; display: flex; align-items: center; justify-content: center; font-size: 44px; font-weight: bold; }
+    .avatar-img { object-fit: cover; display: none; }
+    
+    /* 隐藏原生文件上传 */
+    #avatarInput { display: none; }
+    
+    /* 自定义更换头像按钮 */
+    .btn-change-avatar { padding: 6px 16px; background: #f1f5f9; color: var(--primary-color); border: 1px solid #e2e8f0; border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+    .btn-change-avatar:hover { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+
+    .user-info { flex: 1; min-width: 280px; }
+    .nickname-wrapper { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .nickname-wrapper h3 { font-size: 24px; color: var(--text-main); }
+    .btn-edit-nickname { padding: 4px 10px; font-size: 12px; background: #f1f5f9; color: var(--primary-color); border: none; border-radius: 6px; cursor: pointer; }
+
+    .user-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 20px; }
+    .info-item { background: #f8fafc; padding: 12px 16px; border-radius: 16px; border: 1px solid #f1f5f9; }
+    .info-label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 2px; }
+    .info-value { font-size: 15px; font-weight: 600; color: var(--text-main); }
+    .info-value.highlight { color: var(--primary-color); }
+
+    /* 列表模块 */
+    .section { background: white; padding: 25px; border-radius: 24px; margin-bottom: 30px; box-shadow: var(--card-shadow); }
+    .section-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .section-title::before { content: ""; width: 4px; height: 18px; background: var(--primary-gradient); border-radius: 2px; }
+
+    .table-container { overflow-x: auto; }
+    .rating-list { width: 100%; border-collapse: collapse; min-width: 600px; }
+    .rating-list th { text-align: left; padding: 12px 15px; color: var(--text-muted); font-size: 14px; border-bottom: 1px solid #f1f5f9; }
+    .rating-list td { padding: 15px; font-size: 14px; border-bottom: 1px solid #f8fafc; }
+    .rating-list tr:hover td { background-color: #fcfcfd; }
+    .rating-score { display: inline-block; padding: 2px 10px; background: #fffbeb; color: #d97706; border-radius: 6px; font-weight: 700; }
+    .empty-tip { text-align: center; color: var(--text-muted); padding: 50px !important; }
+
+    /* 弹窗设计 */
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px); display: none; justify-content: center; align-items: center; z-index: 9999; padding: 20px; }
+    .modal-content { background: white; border-radius: 28px; padding: 30px; width: 100%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+    .modal-title { font-size: 20px; margin-bottom: 20px; text-align: center; font-weight: 700; }
+    .nickname-input { width: 100%; padding: 14px 18px; border: 2px solid #e2e8f0; border-radius: 14px; font-size: 16px; margin-bottom: 20px; outline: none; transition: border-color 0.3s; }
+    .nickname-input:focus { border-color: var(--primary-color); }
+    .modal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .loading { text-align: center; padding: 100px 0; color: var(--text-muted); font-size: 18px; }
+    .crop-container { width: 100%; height: 350px; background: #f1f5f9; margin-bottom: 20px; border-radius: 16px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="songs-list.html" class="btn btn-back">← 返回歌曲列表</a>
+      <h1 class="header-title">个人中心</h1>
+      <button class="btn btn-logout" id="logoutBtn">退出登录</button>
+    </div>
+
+    <div class="loading" id="loading">✨ 正在获取音乐档案...</div>
+
+    <div id="profileContent" style="display: none;">
+      <div class="user-card">
+        <div class="avatar-area">
+          <div class="avatar" id="userAvatar">U</div>
+          <img src="" alt="用户头像" id="userAvatarImg" class="avatar-img">
+          <input type="file" id="avatarInput" accept="image/*">
+          <button class="btn-change-avatar" id="changeAvatarBtn">更换头像</button>
+        </div>
+        
+        <div class="user-info">
+          <div class="nickname-wrapper">
+            <!-- 【修改1】显示昵称而非username，username作为副标题 -->
+            <div>
+              <h3 id="showNickname">用户名</h3>
+              <small style="color: var(--text-muted); font-size: 12px;">@<span id="username">username</span></small>
+            </div>
+            <button class="btn-edit-nickname" id="editNicknameBtn">编辑资料</button>
+          </div>
+          <div class="user-details">
+            <div class="info-item"><span class="info-label">我的昵称</span><span class="info-value" id="nickname">未设置</span></div>
+            <div class="info-item"><span class="info-label">入驻时间</span><span class="info-value" id="joinTime">--</span></div>
+            <div class="info-item"><span class="info-label">歌曲评分</span><span class="info-value highlight"><span id="songRatingCount">0</span> 首</span></div>
+            <div class="info-item"><span class="info-label">单曲评分</span><span class="info-value highlight"><span id="singleRatingCount">0</span> 首</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2 class="section-title">我的歌曲评分</h2>
+        <div class="table-container">
+          <table class="rating-list">
+            <thead>
+              <tr><th>歌曲名</th><th>专辑</th><th>我的评分</th><th>评分时间</th></tr>
+            </thead>
+            <tbody id="songRatingList">
+              <tr><td colspan="4" class="empty-tip">暂无歌曲评分</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2 class="section-title">我的单曲评分</h2>
+        <div class="table-container">
+          <table class="rating-list">
+            <thead>
+              <tr><td>单曲名</td><td>发行时间</td><td>我的评分</td><td>评分时间</td></tr>
+            </thead>
+            <tbody id="singleRatingList">
+              <tr><td colspan="4" class="empty-tip">暂无单曲评分</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="cropModal">
+    <div class="modal-content">
+      <h3 class="modal-title">裁剪头像</h3>
+      <div class="crop-container"><img id="cropImage" src=""></div>
+      <div class="modal-btns">
+        <button class="btn btn-logout" id="cropCancelBtn" style="justify-content: center;">取消</button>
+        <button class="btn btn-back" id="cropConfirmBtn" style="background: var(--primary-gradient); color: white; justify-content: center;">确认裁剪</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="nicknameModal">
+    <div class="modal-content">
+      <h3 class="modal-title">修改昵称</h3>
+      <input type="text" class="nickname-input" id="nicknameInput" placeholder="请输入新昵称（2-10个字符）">
+      <div class="modal-btns">
+        <button class="btn btn-logout" id="cancelNicknameBtn" style="justify-content: center;">取消</button>
+        <button class="btn btn-back" id="saveNicknameBtn" style="background: var(--primary-gradient); color: white; justify-content: center;">保存修改</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* 核心业务逻辑 */
+    let userToken = localStorage.getItem('music_user_token');
+    let username = '';
+    let cropper = null;
+
+    // ========== 新增：调试日志函数 ==========
+    function log(msg, data = '') {
+      console.log(`【个人中心】${msg}`, data);
+    }
+
+    function checkLogin() {
+      if (!userToken) { 
+        alert('请先登录！'); 
+        window.location.href = 'login.html'; 
+        return false; 
+      }
+      // 新增：验证token格式
+      if (!userToken.includes('.')) {
+        alert('登录凭证无效，请重新登录！');
+        localStorage.removeItem('music_user_token');
+        window.location.href = 'login.html';
+        return false;
+      }
+      return true;
+    }
+
+    function parseJwt(token) {
+      try {
+        const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        // 新增：处理base64填充
+        const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+        const jsonPayload = decodeURIComponent(atob(paddedBase64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+        const payload = JSON.parse(jsonPayload);
+        log('Token解析结果', payload);
+        return payload;
+      } catch (e) { 
+        log('Token解析失败', e);
+        return null; 
+      }
+    }
+
+    // 压缩图片
+    function compressImage(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+          const img = new Image();
+          img.src = e.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 200; canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, 200, 200);
+            resolve(canvas.toDataURL('image/jpeg', 0.8));
+          };
+        };
+      });
+    }
+
+    // 裁剪流程
+    function cropSelectedImage(file) {
+      return new Promise((resolve) => { 
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => { 
+          const cropImage = document.getElementById('cropImage');
+          const cropModal = document.getElementById('cropModal');
+          cropImage.src = e.target.result;
+          cropModal.style.display = 'flex';
+          cropper = new Cropper(cropImage, { aspectRatio: 1, viewMode: 1 }); 
+          document.getElementById('cropConfirmBtn').onclick = () => { 
+            cropper.getCroppedCanvas().toBlob((blob) => { 
+              cropper.destroy(); cropModal.style.display = 'none';
+              resolve(new File([blob], "avatar.jpg", { type: "image/jpeg" }));
+            }, "image/jpeg"); 
+          }; 
+          document.getElementById('cropCancelBtn').onclick = () => { cropper.destroy(); cropModal.style.display = 'none'; resolve(null); }; 
+        }; 
+      }); 
+    }
+
+    async function apiUpdate(data) {
+      try {
+        // 【修改2】统一接口地址为localhost，和后端保持一致
+        const resp = await fetch('http://localhost:3000/api/user/update', {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${userToken}`, 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include', // 【新增】携带cookie，兼容后端CORS配置
+          body: JSON.stringify(data)
+        });
+
+        // 新增：处理HTTP状态码非200的情况
+        if (!resp.ok) {
+          throw new Error(`请求失败：${resp.status} ${resp.statusText}`);
+        }
+
+        const result = await resp.json();
+        log('apiUpdate返回结果', result);
+        return result;
+      } catch (e) {
+        log('apiUpdate请求失败', e);
+        alert('接口请求失败：' + e.message);
+        return { code: 500, msg: e.message };
+      }
+    }
+
+    async function getUserInfo() {
+      // 新增：先清空loading，避免卡死
+      try {
+        const decoded = parseJwt(userToken);
+        if (!decoded) {
+          alert('登录凭证解析失败，请重新登录！');
+          localStorage.removeItem('music_user_token');
+          window.location.href = 'login.html';
+          return;
+        }
+        username = decoded.username || decoded.sub || '';
+        log('解析出的用户名', username);
+
+        // 【修改3】统一接口地址为localhost，添加credentials
+        const resp = await fetch('http://localhost:3000/api/user/info', { 
+          headers: { 
+            'Authorization': `Bearer ${userToken}`,
+            'Accept': 'application/json'
+          },
+          credentials: 'include'
+        });
+
+        // 新增：处理HTTP状态码非200的情况
+        if (!resp.ok) {
+          throw new Error(`获取用户信息失败：${resp.status} ${resp.statusText}`);
+        }
+
+        const result = await resp.json();
+        log('getUserInfo返回结果', result);
+        
+        // 【新增】接口错误处理
+        if (result.code !== 200) {
+          throw new Error(result.msg || '获取用户信息失败');
+        }
+
+        const data = result.data || {};
+        // 【修改4】兼容后端字段名：nick_name（后端）→ nickname（前端）
+        const userNickname = data.nick_name || data.nickname || username;
+        // 【修改5】正确赋值：用户名显示@username，昵称显示nickname
+        document.getElementById('username').textContent = username || '未知用户';
+        // 优先显示昵称，无则显示username
+        document.getElementById('nickname').textContent = userNickname;
+        document.getElementById('showNickname').textContent = userNickname;
+        
+        // 【修改6】兼容后端时间字段：created_at/createdAt
+        const joinTime = data.created_at || data.createdAt;
+        if (joinTime) {
+          document.getElementById('joinTime').textContent = new Date(joinTime).toLocaleDateString();
+        } else {
+          document.getElementById('joinTime').textContent = '未知';
+        }
+        
+        const avatarImg = document.getElementById('userAvatarImg');
+        const avatarTxt = document.getElementById('userAvatar');
+        // 兼容头像字段
+        const avatarUrl = data.avatar || data.avatar_url || '';
+        if (avatarUrl && avatarUrl.trim() !== '') { 
+          avatarImg.src = avatarUrl; 
+          avatarImg.style.display = 'block'; 
+          avatarTxt.style.display = 'none'; 
+          // 新增：头像加载失败时显示默认文字
+          avatarImg.onerror = () => {
+            avatarImg.style.display = 'none';
+            avatarTxt.style.display = 'flex';
+            // 显示用户名首字母
+            avatarTxt.textContent = userNickname.charAt(0).toUpperCase();
+          };
+        } else {
+          // 显示用户名首字母
+          avatarTxt.textContent = userNickname.charAt(0).toUpperCase();
+        }
+
+        // 更换头像按钮点击
+        document.getElementById('changeAvatarBtn').onclick = () => document.getElementById('avatarInput').click();
+        document.getElementById('avatarInput').onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const cropped = await cropSelectedImage(file);
+          if (cropped) {
+            const base64 = await compressImage(cropped);
+            const res = await apiUpdate({ 
+              avatar: base64,
+              // 兼容后端字段名
+              avatar_url: base64 
+            });
+            if (res.code === 200) { 
+              avatarImg.src = base64; 
+              avatarImg.style.display = 'block'; 
+              avatarTxt.style.display = 'none'; 
+              alert('头像修改成功！');
+            } else {
+              alert('头像修改失败：' + (res.msg || '未知错误'));
+            }
+          }
+          e.target.value = ''; // 重置input
+        };
+
+        // 昵称修改
+        const nickModal = document.getElementById('nicknameModal');
+        const nickInput = document.getElementById('nicknameInput');
+        document.getElementById('editNicknameBtn').onclick = () => {
+          // 【修改7】弹窗默认填充当前昵称
+          nickInput.value = userNickname;
+          nickModal.style.display = 'flex';
+          // 自动聚焦输入框
+          nickInput.focus();
+          // 选中现有内容，方便修改
+          nickInput.select();
+        };
+        document.getElementById('cancelNicknameBtn').onclick = () => nickModal.style.display = 'none';
+        document.getElementById('saveNicknameBtn').onclick = async () => {
+          const val = nickInput.value.trim();
+          // 【修改8】完整的昵称校验（2-10个字符）
+          if (val.length < 2) {
+            return alert('昵称长度不能少于2个字符！');
+          }
+          if (val.length > 10) {
+            return alert('昵称长度不能超过10个字符！');
+          }
+          
+          // 兼容后端字段名：nick_name
+          const res = await apiUpdate({ 
+            nickname: val,
+            nick_name: val 
+          });
+          if (res.code === 200) { 
+            // 【修改9】修改成功后立即更新页面显示
+            document.getElementById('nickname').textContent = val;
+            document.getElementById('showNickname').textContent = val;
+            nickModal.style.display = 'none';
+            alert('昵称修改成功！');
+          } else {
+            alert('昵称修改失败：' + (res.msg || '未知错误'));
+          }
+        };
+      } catch (e) { 
+        console.error('获取用户信息失败：', e);
+        alert('获取用户信息失败：' + e.message + '，请刷新页面重试');
+        // 显示错误后仍展示页面（空数据）
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('profileContent').style.display = 'block';
+      }
+    }
+
+    async function getRatings() {
+      const fetchRatings = async (type) => {
+        try {
+          // 【修改10】统一接口地址为localhost，添加credentials
+          const res = await fetch(`http://localhost:3000/api/user/ratings/${type}`, { 
+            headers: { 
+              'Authorization': `Bearer ${userToken}`,
+              'Accept': 'application/json'
+            },
+            credentials: 'include'
+          });
+
+          // 新增：处理HTTP状态码非200的情况
+          if (!res.ok) {
+            throw new Error(`获取${type}评分失败：${res.status} ${res.statusText}`);
+          }
+
+          const result = await res.json();
+          log(`getRatings-${type}返回结果`, result);
+          return result;
+        } catch (e) {
+          log(`fetchRatings-${type}请求失败`, e);
+          alert(`获取${type}评分失败：${e.message}`);
+          return { code: 500, msg: e.message };
+        }
+      };
+
+      try {
+        const songs = await fetchRatings('songs');
+        const singles = await fetchRatings('singles');
+
+        const render = (targetId, countId, data, isSingle) => {
+          // 【新增】接口错误处理
+          if (!data || data.code !== 200) {
+            document.getElementById(countId).textContent = 0;
+            document.getElementById(targetId).innerHTML = `<tr><td colspan="4" class="empty-tip">加载${isSingle ? '单曲' : '歌曲'}评分失败</td></tr>`;
+            return;
+          }
+          
+          const ratingData = data.data || [];
+          log(`渲染${isSingle ? '单曲' : '歌曲'}评分数据`, ratingData);
+          document.getElementById(countId).textContent = ratingData.length;
+          const body = document.getElementById(targetId);
+          
+          if (ratingData.length > 0) {
+            body.innerHTML = ratingData.map(item => {
+              // 兼容字段名：处理可能的空值
+              const itemData = isSingle ? (item.single || {}) : (item.song || {});
+              const albumData = item.album || {};
+              const ratingData = item.rating || {};
+              
+              const name = itemData.name_cn || itemData.name || '未知';
+              const subInfo = isSingle ? (itemData.release_date || itemData.release_at || '--') : (albumData.name_cn || albumData.name || '--');
+              const score = ratingData.score || 0;
+              const time = ratingData.createdAt || ratingData.created_at || '--';
+              const showTime = time !== '--' ? new Date(time).toLocaleDateString() : '--';
+              
+              return `
+                <tr>
+                  <td><strong>${name}</strong></td>
+                  <td>${subInfo}</td>
+                  <td><span class="rating-score">${score} 分</span></td>
+                  <td>${showTime}</td>
+                </tr>
+              `;
+            }).join('');
+          } else {
+            // 空数据提示
+            body.innerHTML = `<tr><td colspan="4" class="empty-tip">暂无${isSingle ? '单曲' : '歌曲'}评分</td></tr>`;
+          }
+        };
+        
+        render('songRatingList', 'songRatingCount', songs, false);
+        render('singleRatingList', 'singleRatingCount', singles, true);
+      } catch (e) {
+        console.error('获取评分数据失败：', e);
+        alert('获取评分数据失败：' + e.message + '，请刷新页面重试');
+      }
+    }
+
+    window.onload = async () => {
+      if (checkLogin()) {
+        try {
+          // 【修改11】顺序执行，确保用户信息先加载
+          await getUserInfo();
+          await getRatings();
+        } catch (e) {
+          log('页面加载主流程失败', e);
+          alert('页面加载失败：' + e.message);
+        } finally {
+          // 无论成功失败，都隐藏loading显示内容
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('profileContent').style.display = 'block';
+        }
+      }
+      document.getElementById('logoutBtn').onclick = () => {
+        if (confirm('确定要退出登录吗？')) { 
+          localStorage.removeItem('music_user_token'); 
+          // 【新增】清除用户信息缓存（和歌曲详情页保持一致）
+          localStorage.removeItem('music_user_info');
+          window.location.href = 'login.html'; 
+        }
+      };
+    };
+  </script>
+</body>
+</html>

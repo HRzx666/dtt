@@ -224,6 +224,8 @@
             <p id="welcomeText"></p>
             <button class="go-home-btn" id="goHomeBtn">前往专辑评分首页</button>
             <button class="go-home-btn" style="background-color: #666; margin-top: 15px;" id="showLoginPanelBtn">返回登录面板</button>
+            <!-- 新增：前往个人中心按钮 -->
+            <button class="go-home-btn" style="background-color: #007bff; margin-top: 15px;" id="goProfileBtn">前往个人中心</button>
         </div>
 
         <!-- 登录面板（默认显示） -->
@@ -278,7 +280,7 @@
             </form>
         </div>
     </section>
-
+     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
         // 后端接口基础地址
         const BASE_URL = 'http://localhost:3000';
@@ -304,9 +306,9 @@
                     'Content-Type': 'application/json'
                 };
                 
-                // 如果需要token，自动添加到请求头
+                // 如果需要token，自动添加到请求头（修改：读取music_user_token，适配个人主页）
                 if (needToken) {
-                    const token = localStorage.getItem('token');
+                    const token = localStorage.getItem('music_user_token');
                     if (!token) {
                         alert('登录已过期，请重新登录');
                         logout(); // 清空登录态
@@ -338,7 +340,8 @@
         // 4. 封装GET请求（替换为axios，用于获取用户信息等）
         const requestGet = async (url) => {
             try {
-                const token = localStorage.getItem('token');
+                // 修改：读取music_user_token，适配个人主页
+                const token = localStorage.getItem('music_user_token');
                 if (!token) {
                     return { code: 401, msg: '未登录' };
                 }
@@ -367,7 +370,8 @@
         // 5. 检查登录状态（优化：显示成功面板，避免空白）
         const checkLoginStatus = () => {
             const currentUser = localStorage.getItem('currentUser');
-            const token = localStorage.getItem('token');
+            // 修改：读取music_user_token，适配个人主页
+            const token = localStorage.getItem('music_user_token');
             
             if (currentUser && token) {
                 // 显示登录状态提示
@@ -397,7 +401,8 @@
         // 6. 退出登录
         const logout = () => {
             localStorage.removeItem('currentUser');
-            localStorage.removeItem('token');
+            // 修改：清除music_user_token，适配个人主页
+            localStorage.removeItem('music_user_token');
             checkLoginStatus(); // 刷新状态
             alert('已成功退出登录');
         };
@@ -429,7 +434,7 @@
             hideError(document.getElementById('regConfirmPwd'), document.getElementById('regConfirmTip'));
         });
 
-        // ==================== 登录逻辑（对接后端接口，保留原有逻辑） ====================
+        // ==================== 登录逻辑（核心修改：直接跳转首页，适配个人主页） ====================
         const loginBtn = document.getElementById('loginBtn');
         const loginUsername = document.getElementById('loginUsername');
         const loginPassword = document.getElementById('loginPassword');
@@ -464,16 +469,14 @@
                 });
 
                 if (result.code === 200) {
-                    alert('登录成功！');
-                    // 存储登录状态（用户名+token）
+                    // 修改1：去掉登录成功的alert提示
+                    // 修改2：存储token的键改为music_user_token，适配个人主页
                     localStorage.setItem('currentUser', username);
-                    localStorage.setItem('token', result.data.token); // 存储后端返回的token
+                    localStorage.setItem('music_user_token', result.data.token); // 关键：和个人主页token键统一
                     // 清空表单
                     document.getElementById('loginForm').reset();
-                    // 检查并更新登录状态
-                    checkLoginStatus();
-                    // 可选：跳转到首页
-                    // window.location.href = '/index.html';
+                    // 修改3：直接跳转到首页，不再询问
+                    window.location.href = '/index.html';
                 } else {
                     // 后端返回的错误提示
                     if (result.msg.includes('用户名不存在')) {
@@ -570,9 +573,8 @@
         regConfirmPwd.addEventListener('input', () => hideError(regConfirmPwd, regConfirmTip));
 
         // ==================== 新增：成功面板按钮逻辑 ====================
-        // 前往首页按钮（可修改跳转地址）
+        // 前往首页按钮（直接跳转，无询问）
         document.getElementById('goHomeBtn').addEventListener('click', () => {
-            // 替换为你的首页地址，比如 index.html
             window.location.href = '/index.html'; 
         });
 
@@ -580,6 +582,11 @@
         document.getElementById('showLoginPanelBtn').addEventListener('click', () => {
             document.getElementById('successPanel').style.display = 'none';
             document.getElementById('normalLoginPanel').style.display = 'flex';
+        });
+
+        // 新增：前往个人中心按钮（适配个人主页）
+        document.getElementById('goProfileBtn').addEventListener('click', () => {
+            window.location.href = '/user.html'; 
         });
 
         // ==================== 退出登录逻辑（保留原有逻辑） ====================

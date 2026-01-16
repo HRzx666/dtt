@@ -3,22 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>歌曲详情 - 音乐收藏</title>
+  <title>歌曲详情与评论</title>
   <style>
-    /* 定义现代色彩变量 */
+    /* ========== 全局变量定义 ========== */
     :root {
-      --primary: #6366f1;         /* 现代靛蓝 */
-      --primary-hover: #4f46e5;
-      --bg-body: #fbfcfd;         /* 极浅灰蓝背景 */
-      --bg-card: #ffffff;
-      --text-main: #1e293b;       /* 深石板灰 */
-      --text-muted: #64748b;      /* 中性灰 */
-      --border-color: #f1f5f9;    /* 超浅边框 */
-      --accent-orange: #f59e0b;   /* 柔和橙色 */
+      --primary: #6366f1;         /* 主色：现代靛蓝 */
+      --primary-hover: #4f46e5;   /* 主色hover */
+      --bg-body: #fbfcfd;         /* 页面背景 */
+      --bg-card: #ffffff;         /* 卡片背景 */
+      --text-main: #1e293b;       /* 主要文字 */
+      --text-muted: #64748b;      /* 次要文字 */
+      --border-color: #f1f5f9;    /* 边框色 */
+      --accent-orange: #f59e0b;   /* 评分橙色 */
+      --danger-red: #ff4d4f;      /* 点赞红色 */
+      --success-green: #52c41a;   /* 提示绿色 */
       --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-      --comment-bg: #fafafa;      /* 评论背景色 */
+      --comment-bg: #fafafa;      /* 评论背景 */
     }
 
+    /* ========== 基础重置 ========== */
     * {
       margin: 0;
       padding: 0;
@@ -35,6 +38,7 @@
       justify-content: center;
     }
 
+    /* ========== 容器样式 ========== */
     .container {
       width: 100%;
       max-width: 800px;
@@ -45,7 +49,7 @@
       overflow: hidden;
     }
 
-    /* 顶部导航 */
+    /* ========== 头部样式 ========== */
     .header {
       padding: 1.25rem 2rem;
       border-bottom: 1px solid var(--border-color);
@@ -54,20 +58,46 @@
     }
 
     .back-btn {
-      color: var(--text-muted);
-      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 16px;
+      cursor: pointer;
+      background-color: #ffffff;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
       font-size: 0.9rem;
       font-weight: 500;
-      transition: color 0.2s;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      outline: none;
     }
 
     .back-btn:hover {
+      background-color: #f8fafc;
+      border-color: #cbd5e1;
       color: var(--primary);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
 
-    /* 歌曲信息区 */
+    .back-btn:active {
+      background-color: #f1f5f9;
+      transform: scale(0.97);
+    }
+
+    .back-btn:disabled {
+      background-color: #ffffff;
+      color: #cbd5e1;
+      border-color: #f1f5f9;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* ========== 歌曲内容区域 ========== */
     .song-content {
       padding: 2.5rem;
+      display: none; /* 初始隐藏，加载完成后显示 */
     }
 
     .song-header {
@@ -103,7 +133,7 @@
       font-size: 0.85rem;
     }
 
-    /* 评分卡片区 */
+    /* ========== 评分卡片样式 ========== */
     .score-card {
       background: #f8fafc;
       border-radius: 12px;
@@ -139,7 +169,13 @@
       font-size: 0.9rem;
     }
 
-    /* 互动打分 */
+    #scoreLoading {
+      font-size: 0.75rem;
+      color: var(--primary);
+      margin-left: 10px;
+      display: none;
+    }
+
     .rating-action {
       text-align: right;
     }
@@ -191,7 +227,7 @@
       color: var(--text-muted);
     }
 
-    /* 详细参数 */
+    /* ========== 歌曲详情网格 ========== */
     .details-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -216,8 +252,7 @@
       color: var(--text-main);
     }
 
-    /* ===================== 新增：评论区样式 ===================== */
-    /* 评论区标题 */
+    /* ========== 评论区域样式 ========== */
     .comments-section {
       margin-top: 3rem;
       border-top: 1px solid var(--border-color);
@@ -242,7 +277,7 @@
       font-size: 0.875rem;
     }
 
-    /* 发布评论区 */
+    /* ========== 评论发布表单 ========== */
     .comment-form {
       background: var(--comment-bg);
       border-radius: 12px;
@@ -268,7 +303,7 @@
 
     .comment-input:focus {
       outline: none;
-      border-color: var(--primary);
+	border-color: var(--primary);
       box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
     }
 
@@ -322,14 +357,58 @@
       font-weight: 600;
     }
 
-    /* 评论列表 */
+    /* ========== 评论列表 ========== */
     .comments-list {
       margin-bottom: 2rem;
+      display: none; /* 初始隐藏 */
     }
 
     .comment-item {
       padding: 1.25rem 0;
       border-bottom: 1px solid var(--border-color);
+      display: flex;
+      gap: 12px;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    /* 临时评论标记 */
+    .temp-comment {
+      opacity: 0.8;
+      border-left: 3px solid #ffa500;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 评论头像 */
+    .comment-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .comment-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .comment-avatar-placeholder {
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    .comment-content-wrapper {
+      flex: 1;
+      min-width: 0;
     }
 
     .comment-item:last-child {
@@ -343,9 +422,9 @@
       margin-bottom: 0.75rem;
     }
 
-    .comment-username {
+    .comment-nickname {
+      color: var(--primary);
       font-weight: 600;
-      color: var(--text-main);
       font-size: 0.95rem;
     }
 
@@ -361,12 +440,315 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+    
+    /* 评论/回复中的图片样式 - 新增适配图片渲染 */
+    .comment-img, .reply-img {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 8px;
+      margin: 8px 0;
+      object-fit: cover;
+    }
 
-    /* 空评论状态 */
+    /* ========== 评论操作（点赞+回复） ========== */
+    .comment-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 1rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border-color);
+    }
+
+    /* 点赞按钮 */
+    .like-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      transition: all 0.2s;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .like-btn:hover {
+      color: var(--danger-red);
+    }
+
+    .like-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      color: var(--border-color);
+    }
+
+    /* 爱心图标 */
+    .heart-icon {
+      font-size: 1rem;
+      color: transparent;
+      text-shadow: 0 0 0 #ccc;
+      transition: color 0.2s ease;
+    }
+
+    .heart-icon.liked {
+      color: var(--danger-red);
+      text-shadow: none;
+      animation: heartBeat 0.3s ease forwards;
+    }
+
+    @keyframes heartBeat {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    .comment-like-count, .reply-like-count {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    /* 回复按钮 */
+    .reply-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .reply-btn:hover {
+      color: var(--primary);
+    }
+
+    .reply-btn:disabled {
+      cursor: not-allowed;
+      color: var(--border-color);
+    }
+
+    /* ========== 回复列表 ========== */
+    .replies-list {
+      margin-top: 1rem;
+      padding-left: 1.5rem;
+      border-left: 2px solid var(--border-color);
+      gap: 1rem;
+      display: none; /* 默认折叠 */
+      flex-direction: column;
+    }
+    .replies-list.show {
+      display: flex; /* 点击展开后显示 */
+    }
+
+    /* ========== 回复项核心样式 - 修复布局错乱 重点 ✅✅✅ ========== */
+    .reply-item {
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border-color);
+      display: flex !important; /* 强制flex生效，优先级拉满 */
+      align-items: flex-start;   /* 头像与内容顶部对齐 */
+      gap: 12px;                 /* 头像和内容间距 */
+      width: 100%;
+    }
+    .reply-item:last-child {
+      border-bottom: none; /* 最后一个回复去掉下边框 */
+    }
+
+    /* 回复头像样式 */
+    .reply-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0; /* 头像永不被挤压变形 */
+      overflow: hidden;
+      flex: none;
+    }
+    .reply-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .reply-avatar-placeholder {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* 回复内容容器 - 解决内容溢出/不换行 */
+    .reply-content-wrapper {
+      flex: 1;          /* 占满剩余所有空间 */
+      min-width: 0;     /* 关键属性：解决flex子元素内容溢出不换行 */
+    }
+
+    /* 临时回复标识 - 橙色边框不遮挡头像 */
+    .temp-reply {
+      opacity: 0.8;
+    }
+    .temp-reply .reply-content-wrapper {
+      border-left: 2px solid #ffa500;
+      padding-left: 12px;
+      margin-left: -12px;
+    }
+
+    .reply-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .reply-username {
+      font-weight: 600;
+      color: var(--primary);
+      font-size: 0.875rem;
+    }
+
+    .reply-to {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-left: 4px;
+    }
+
+    .reply-time {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .reply-content {
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: var(--text-main);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* 回复操作栏 */
+    .reply-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      marginTop: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border-color);
+    }
+
+    /* 回复中 @用户 的样式：突出显示 */
+    .reply-at-user {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* 暂无回复提示 */
+    .empty-replies-tip {
+      padding: 1rem 0;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      text-align: left;
+    }
+
+    /* ========== 回复表单 ========== */
+    .reply-form {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: var(--comment-bg);
+      border-radius: 8px;
+      display: none;
+    }
+
+    .reply-form.show {
+      display: block;
+      animation: fadeIn 0.3s ease forwards;
+    }
+
+    .reply-input-wrapper {
+      margin-bottom: 0.75rem;
+    }
+
+    .reply-input {
+      width: 100%;
+      min-height: 60px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.875rem;
+      resize: vertical;
+      background: white;
+      transition: border-color 0.2s;
+    }
+
+    .reply-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+    }
+
+    .reply-input::placeholder {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .reply-form-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .reply-length-tip {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .reply-submit-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .reply-submit-btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .reply-submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .reply-cancel-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .reply-cancel-btn:hover {
+      color: var(--text-main);
+      border-color: #cbd5e1;
+    }
+
+    /* ========== 空评论/加载状态 ========== */
     .empty-comments {
       text-align: center;
       padding: 3rem 1rem;
       color: var(--text-muted);
+      display: none; /* 初始隐藏 */
     }
 
     .empty-comments-icon {
@@ -375,13 +757,24 @@
       color: #e2e8f0;
     }
 
-    /* 评论分页 */
+    .comments-loading, .loading-overlay {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+    }
+
+    .loading-overlay {
+      padding: 5rem;
+    }
+
+    /* ========== 评论分页 ========== */
     .comments-pagination {
       display: flex;
       justify-content: center;
       align-items: center;
       gap: 8px;
       margin-top: 2rem;
+      display: none; /* 初始隐藏 */
     }
 
     .page-btn {
@@ -415,46 +808,60 @@
       border-color: var(--primary);
     }
 
-    /* 评论加载状态 */
-    .comments-loading {
-      text-align: center;
-      padding: 2rem;
-      color: var(--text-muted);
-    }
-    /* ===================== 评论区样式结束 ===================== */
-
-    /* 加载中状态 */
-    .loading-overlay {
-      padding: 5rem;
-      text-align: center;
-      color: var(--text-muted);
-    }
-
-    #scoreLoading {
-      font-size: 0.75rem;
-      color: var(--primary);
-      margin-left: 10px;
-      display: none;
+    /* ========== 全局提示框 ========== */
+    .comment-tip {
+      font-size: 0.9rem;
+      font-weight: 500;
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 16px;
+      border-radius: 4px;
+      color: #fff;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
 
+    /* ========== 响应式适配 ========== */
     @media (max-width: 640px) {
-      .score-card { flex-direction: column; text-align: center; gap: 1.5rem; }
+      .back-btn {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+      }
+      .score-card { 
+        flex-direction: column; 
+        text-align: center; 
+        gap: 1.5rem; 
+      }
       .rating-action { text-align: center; }
       .star-group { justify-content: center; }
       .song-content { padding: 1.5rem; }
-      .comments-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+      .comments-header { 
+        flex-direction: column; 
+        align-items: flex-start; 
+        gap: 0.5rem; 
+      }
+      .comment-avatar { width: 36px; height: 36px; }
+      .reply-avatar { width: 32px; height: 32px; }
+      .replies-list { padding-left: 0.8rem; }
     }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- 头部返回按钮 -->
     <div class="header">
-      <a href="songs-list.html" class="back-btn">← 返回列表</a>
+      <button class="back-btn" id="backToListBtn">← 返回列表</button>
     </div>
 
-    <div id="loading" class="loading-overlay">正在获取歌曲信息...</div>
+    <!-- 加载中提示 -->
+    <div id="loading" class="loading-overlay">正在获取资源信息...</div>
 
-    <div id="songDetail" class="song-content" style="display: none;">
+    <!-- 歌曲详情主体 -->
+    <div id="songDetail" class="song-content">
+      <!-- 歌曲标题与元信息 -->
       <div class="song-header">
         <h1 class="song-title" id="songName">加载中...</h1>
         <div class="meta-row">
@@ -463,6 +870,7 @@
         </div>
       </div>
 
+      <!-- 评分卡片 -->
       <div class="score-card">
         <div class="score-info">
           <h3>听众评分</h3>
@@ -472,7 +880,6 @@
             <span id="scoreLoading">同步中...</span>
           </div>
         </div>
-
         <div class="rating-action">
           <div class="star-group" id="starRating">
             <span class="star" data-score="1">★</span>
@@ -486,6 +893,7 @@
         </div>
       </div>
 
+      <!-- 歌曲详情网格 -->
       <div class="details-grid">
         <div class="detail-item">
           <label>作词</label>
@@ -505,14 +913,14 @@
         </div>
       </div>
 
-      <!-- ===================== 新增：评论区HTML ===================== -->
-      <div class="comments-section">
+      <!-- 评论区域 -->
+      <div class="comments-section" id="commentsSection">
         <div class="comments-header">
           <h2 class="comments-title">听众评论</h2>
           <span class="comments-count" id="commentsTotalCount">0 条评论</span>
         </div>
 
-        <!-- 发布评论区域 -->
+        <!-- 评论发布表单 -->
         <div id="commentFormContainer" class="comment-form">
           <div id="commentLoginTip" class="comment-login-tip">
             <a href="login.html">请登录</a> 后发表你的看法
@@ -532,395 +940,1739 @@
           </div>
         </div>
 
-        <!-- 评论列表 -->
+        <!-- 评论加载状态 -->
         <div id="commentsLoading" class="comments-loading">加载评论中...</div>
-        <div id="emptyComments" class="empty-comments" style="display: none;">
+        
+        <!-- 空评论提示 -->
+        <div id="emptyComments" class="empty-comments">
           <div class="empty-comments-icon">💬</div>
-          <p>暂无评论，快来抢沙发吧～</p>
+          <p></p>
         </div>
-        <div id="commentsList" class="comments-list" style="display: none;"></div>
+
+        <!-- 评论列表 -->
+        <div id="commentsList" class="comments-list"></div>
 
         <!-- 评论分页 -->
-        <div id="commentsPagination" class="comments-pagination" style="display: none;"></div>
+        <div id="commentsPagination" class="comments-pagination"></div>
       </div>
-      <!-- ===================== 评论区HTML结束 ===================== -->
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <script>
-    const songId = new URLSearchParams(window.location.search).get('songId');
-    let selectedScore = 0;
+<!-- 引入axios -->
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<!-- JS逻辑部分可后续补充，此处仅保留HTML+CSS -->
+<script>
+// ========== 全局变量 ==========
+const searchParams = new URLSearchParams(window.location.search);
+const resourceId = searchParams.get('resourceId');
+const resourceType = searchParams.get('resourceType') || 'song';
+let selectedScore = 0;
+console.log(`【全局初始化】【页面参数】 resourceId=${resourceId}, resourceType=${resourceType}，当前页面资源类型为${resourceType}`);
+
+// 评论相关全局变量
+let currentCommentPage = 1;
+const commentPageSize = 20;
+let totalCommentPages = 0;
+console.log(`【全局初始化】【评论分页】 初始页码=${currentCommentPage}, 每页条数=${commentPageSize}`);
+
+// ========== 用户缓存相关函数 ==========
+/**
+ * 保存用户信息到本地缓存
+ * @param {Object} userInfo - 用户信息对象（nick_name/avatar/username）
+ */
+function saveUserToCache(userInfo) {
+  console.log(`【用户缓存】【保存缓存】 开始保存用户信息，入参userInfo=`, userInfo);
+  if (!userInfo) {
+    console.warn(`【用户缓存】【保存缓存】 用户信息为空，终止保存`);
+    return;
+  }
+  const cacheData = {
+    nick_name: userInfo.nick_name || userInfo.nickname || userInfo.username,
+    avatar: userInfo.avatar || '',
+    username: userInfo.username || '',
+    cacheTime: Date.now() // 记录缓存时间，可选：用于过期判断
+  };
+  localStorage.setItem('music_user_info', JSON.stringify(cacheData));
+  console.log(`【用户缓存】【保存缓存】 用户信息保存成功，缓存数据=`, cacheData);
+}
+
+/**
+ * 从本地缓存读取用户信息
+ * @returns {Object} 缓存的用户信息（无则返回null）
+ */
+function getUserFromCache() {
+  console.log(`【用户缓存】【读取缓存】 开始读取本地用户缓存`);
+  const cacheStr = localStorage.getItem('music_user_info');
+  if (!cacheStr) {
+    console.warn(`【用户缓存】【读取缓存】 本地无用户缓存数据，返回null`);
+    return null;
+  }
+  try {
+    const cacheData = JSON.parse(cacheStr);
+    console.log(`【用户缓存】【读取缓存】 读取到缓存数据=`, cacheData);
+    // 可选：缓存过期判断（比如超过24小时则失效）
+    const expireTime = 24 * 60 * 60 * 1000; // 24小时
+    const cacheDiff = Date.now() - cacheData.cacheTime;
+    console.log(`【用户缓存】【过期校验】 缓存时长=${Math.floor(cacheDiff/1000)}秒，过期阈值=${Math.floor(expireTime/1000)}秒`);
+    if (cacheDiff > expireTime) {
+      console.warn(`【用户缓存】【过期校验】 缓存已过期，执行清除缓存操作`);
+      clearUserCache();
+      return null;
+    }
+    console.log(`【用户缓存】【读取缓存】 缓存有效，返回用户信息`);
+    return cacheData;
+  } catch (e) {
+    console.error(`【用户缓存】【读取缓存】 解析缓存失败，错误信息=`, e);
+    clearUserCache();
+    return null;
+  }
+}
+
+/**
+ * 清除本地用户信息缓存
+ */
+function clearUserCache() {
+  console.log(`【用户缓存】【清除缓存】 执行清除本地用户信息缓存操作`);
+  localStorage.removeItem('music_user_info');
+  console.log(`【用户缓存】【清除缓存】 本地用户信息缓存清除完成`);
+}
+
+// ========== 全局辅助函数 ==========
+/**
+ * 全局评论/操作提示框
+ * @param {string} message - 提示内容
+ * @param {string} type - 提示类型（success/error）
+ */
+function showCommentTip(message, type = 'success') {
+  console.log(`【全局工具】【弹窗提示】 提示类型=${type}, 提示内容=${message}`);
+  const tipEl = document.createElement('div');
+  tipEl.className = `comment-tip ${type}`;
+  tipEl.textContent = message;
+  
+  if (type === 'success') {
+    tipEl.style.backgroundColor = '#52c41a';
+  } else {
+    tipEl.style.backgroundColor = '#ff4d4f';
+  }
+  
+  document.body.appendChild(tipEl);
+  setTimeout(() => tipEl.style.opacity = '1', 10);
+  setTimeout(() => {
+    tipEl.style.opacity = '0';
+    setTimeout(() => document.body.removeChild(tipEl), 300);
+  }, 2000);
+}
+
+/**
+ * 格式化时间（评论/回复创建时间）
+ * @param {string} timeStr - 原始ISO时间字符串
+ * @returns {string} 格式化后的友好时间
+ */
+function formatCommentTime(timeStr) {
+  const d = new Date(timeStr);
+  const diff = Date.now() - d;
+  if (diff < 60000) return "刚刚";
+  if (diff < 3600000) return Math.floor(diff / 60000) + "分钟前";
+  if (diff < 86400000) return Math.floor(diff / 3600000) + "小时前";
+  return d.toLocaleDateString();
+}
+
+/**
+ * 获取默认头像（字符占位）
+ * @param {string} name - 用户名/昵称
+ * @returns {string} 头像占位符HTML
+ */
+function getDefaultAvatar(name) {
+  const ch = name?.trim()?.charAt(0)?.toUpperCase() || "👤";
+  return `<div class="comment-avatar-placeholder">${ch}</div>`;
+}
+
+// ========== 用户信息相关函数 ==========
+/**
+ * 获取当前登录用户信息（缓存优先 + 异步刷新）
+ * @returns {Promise<Object|null>} 用户信息对象或null
+ */
+async function getCurrentUserInfo() {
+  console.group(`【用户信息】【获取当前用户】 开始执行获取用户信息流程`);
+  // ========== 重点TOKEN日志 ==========
+  const token = localStorage.getItem('music_user_token');
+  const desensitizeToken = token ? `${token.slice(0,8)}****${token.slice(-8)}` : '无TOKEN';
+  console.log(`【用户信息】【TOKEN校验】 本地读取TOKEN=${desensitizeToken}, TOKEN是否存在=${!!token}`);
+
+  if (!token) {
+    console.warn(`【用户信息】【TOKEN校验】 TOKEN为空，执行清除缓存操作，返回null`);
+    clearUserCache(); // token失效时清除缓存
+    console.groupEnd();
+    return null;
+  }
+
+  // 核心优化：先读缓存返回，再异步请求最新数据
+  const cacheUser = getUserFromCache();
+  if (cacheUser) {
+    console.log(`【用户信息】【缓存命中】 读取到有效用户缓存，优先返回缓存数据，异步刷新最新数据`);
+    // 异步请求最新数据，更新缓存（不阻塞当前操作）
+    refreshUserInfo(token);
+    console.groupEnd();
+    return cacheUser; // 优先返回缓存
+  }
+
+  // 无缓存时，正常请求并缓存
+  try {
+    console.log(`【用户信息】【接口请求】 无缓存，开始请求用户信息接口，请求地址=http://localhost:3000/api/user/info`);
+    const res = await axios.get('http://localhost:3000/api/user/info', {
+      headers: { 'Authorization': `Bearer ${token}` },
+      withCredentials: true
+    });
+    console.log(`【用户信息】【接口响应】 请求成功，响应状态=${res.status}, 响应数据=`, res.data);
+    const userInfo = res.data.code === 200 ? res.data.data : null;
+    if (userInfo) {
+      console.log(`【用户信息】【接口响应】 接口返回有效用户信息，执行缓存保存`);
+      saveUserToCache(userInfo); // 缓存最新数据
+    } else {
+      console.warn(`【用户信息】【接口响应】 接口返回用户信息为空`);
+    }
+    console.groupEnd();
+    return userInfo;
+  } catch (err) {
+    console.error(`【用户信息】【接口异常】 获取当前用户信息失败, 错误详情=`, err);
+    clearUserCache(); // 请求失败时清除缓存
+    console.groupEnd();
+    return null;
+  }
+}
+
+/**
+ * 异步刷新用户信息（不阻塞UI）
+ * @param {string} token - 用户登录令牌
+ */
+async function refreshUserInfo(token) {
+  console.group(`【用户信息】【异步刷新】 开始异步刷新用户信息`);
+  const desensitizeToken = token ? `${token.slice(0,8)}****${token.slice(-8)}` : '无TOKEN';
+  console.log(`【用户信息】【异步刷新】 刷新使用TOKEN=${desensitizeToken}`);
+  try {
+    const res = await axios.get('http://localhost:3000/api/user/info', {
+      headers: { 'Authorization': `Bearer ${token}` },
+      withCredentials: true
+    });
+    console.log(`【用户信息】【异步刷新】 刷新请求成功，响应数据=`, res.data);
+    const newUserInfo = res.data.code === 200 ? res.data.data : null;
+    if (newUserInfo) {
+      console.log(`【用户信息】【异步刷新】 获取到最新用户信息，更新本地缓存`);
+      saveUserToCache(newUserInfo); // 更新缓存
+    } else {
+      console.warn(`【用户信息】【异步刷新】 刷新返回用户信息为空`);
+    }
+  } catch (err) {
+    console.error(`【用户信息】【异步刷新】 异步刷新用户信息失败, 错误详情=`, err);
+    if (err.response?.status === 401) {
+      console.error(`【用户信息】【异步刷新】 TOKEN失效/未授权，清除缓存和TOKEN`);
+      clearUserCache();
+      localStorage.removeItem('music_user_token');
+    }
+  }
+  console.groupEnd();
+}
+
+// ========== 评分相关函数 ==========
+/**
+ * 获取资源平均评分
+ */
+async function getResourceRating() {
+  console.group(`【评分功能】【获取平均分】 开始获取资源评分`);
+  if (!resourceId) {
+    console.warn(`【评分功能】【获取平均分】 resourceId为空，终止请求`);
+    console.groupEnd();
+    return;
+  }
+  console.log(`【评分功能】【获取平均分】 请求参数：resourceId=${resourceId}, resourceType=${resourceType}`);
+  const scoreLoading = document.getElementById('scoreLoading');
+  scoreLoading.style.display = 'inline';
+  
+  try {
+    const reqUrl = `http://localhost:3000/api/${resourceType}s/${resourceId}/rating/average`;
+    console.log(`【评分功能】【获取平均分】 请求地址=${reqUrl}`);
+    const res = await axios.get(reqUrl, { withCredentials: true });
+    console.log(`【评分功能】【获取平均分】 请求成功，响应数据=`, res.data);
+    if (res.data.code === 200) {
+      const { averageScore, ratingCount } = res.data.data;
+      console.log(`【评分功能】【获取平均分】 解析到评分数据：平均分=${averageScore}, 评分人数=${ratingCount}`);
+      document.getElementById('averageScore').textContent = averageScore || '0.0';
+      document.getElementById('ratingCount').textContent = `${ratingCount || 0} 人参与`;
+    }
+  } catch (err) {
+    console.error(`【评分功能】【获取平均分】 获取评分失败, 错误详情=`, err);
+  } finally {
+    scoreLoading.style.display = 'none';
+    console.groupEnd();
+  }
+}
+
+/**
+ * 获取用户当前对该资源的评分
+ */
+async function getUserCurrentRating() {
+  console.group(`【评分功能】【用户评分】 开始获取用户当前评分`);
+  // ========== 重点TOKEN日志 ==========
+  const token = localStorage.getItem('music_user_token');
+  const desensitizeToken = token ? `${token.slice(0,8)}****${token.slice(-8)}` : '无TOKEN';
+  console.log(`【评分功能】【用户评分】 TOKEN=${desensitizeToken}, TOKEN是否存在=${!!token}, resourceId=${resourceId}`);
+
+  if (!token || !resourceId) {
+    console.warn(`【评分功能】【用户评分】 TOKEN或resourceId为空，终止请求`);
+    console.groupEnd();
+    return;
+  }
+
+  try {
+    const reqUrl = `http://localhost:3000/api/user/${resourceType}s/${resourceId}/rating`;
+    console.log(`【评分功能】【用户评分】 请求地址=${reqUrl}`);
+    const res = await axios.get(reqUrl, {
+      headers: { 'Authorization': `Bearer ${token}` },
+      withCredentials: true
+    });
+    console.log(`【评分功能】【用户评分】 请求成功，响应数据=`, res.data);
+    if (res.data.code === 200 && res.data.data.score) {
+      selectedScore = res.data.data.score;
+      console.log(`【评分功能】【用户评分】 用户已评分，评分星级=${selectedScore}`);
+      updateStarDisplay(selectedScore);
+      document.getElementById('ratingTip').textContent = `已评分：${selectedScore} 星 (可修改)`;
+      document.getElementById('ratingSubmit').disabled = false;
+    } else {
+      console.log(`【评分功能】【用户评分】 用户未对该资源评分`);
+    }
+  } catch (err) {
+    console.warn(`【评分功能】【用户评分】 获取用户评分失败(用户未评分)，静默处理，错误=`, err);
+  }
+  console.groupEnd();
+}
+
+/**
+ * 更新星级显示
+ * @param {number} score - 评分星级
+ */
+function updateStarDisplay(score) {
+  console.log(`【评分功能】【星级更新】 更新星级显示，选中星级=${score}`);
+  const stars = document.querySelectorAll('.star');
+  stars.forEach(s => {
+    s.classList.toggle('active', parseFloat(s.dataset.score) <= score);
+  });
+}
+
+/**
+ * 初始化星级评分系统
+ */
+function initRatingSystem() {
+  console.group(`【评分功能】【初始化】 开始初始化星级评分系统`);
+  const stars = document.querySelectorAll('.star');
+  const submitBtn = document.getElementById('ratingSubmit');
+  const tip = document.getElementById('ratingTip');
+  // ========== 重点TOKEN日志 ==========
+  const token = localStorage.getItem('music_user_token');
+  const desensitizeToken = token ? `${token.slice(0,8)}****${token.slice(-8)}` : '无TOKEN';
+  console.log(`【评分功能】【初始化】 TOKEN=${desensitizeToken}, TOKEN是否存在=${!!token}`);
+
+  if (!token) {
+    console.warn(`【评分功能】【初始化】 TOKEN为空，显示登录提示`);
+    tip.innerHTML = '<a href="login.html" style="color:var(--primary)">请先登录后再评分</a>';
+    console.groupEnd();
+    return;
+  }
+
+  console.log(`【评分功能】【初始化】 TOKEN有效，初始化评分事件绑定`);
+  tip.textContent = "选择星级提交评分";
+
+  stars.forEach(star => {
+    star.addEventListener('mouseenter', () => {
+      const hoverScore = star.dataset.score;
+      stars.forEach(s => s.classList.toggle('hover', s.dataset.score <= hoverScore));
+    });
+
+    star.addEventListener('mouseleave', () => {
+      stars.forEach(s => s.classList.remove('hover'));
+      // 恢复已选星级显示
+      updateStarDisplay(selectedScore);
+    });
+
+    star.addEventListener('click', () => {
+      selectedScore = parseFloat(star.dataset.score);
+      console.log(`【评分功能】【星级选择】 用户点击选择星级=${selectedScore}`);
+      updateStarDisplay(selectedScore);
+      submitBtn.disabled = false;
+      tip.textContent = `准备提交：${selectedScore} 星`;
+    });
+  });
+
+  submitBtn.onclick = async () => {
+    console.log(`【评分功能】【提交评分】 用户点击提交评分，星级=${selectedScore}`);
+    submitBtn.disabled = true;
+    submitBtn.textContent = "提交中...";
     
-    // 评论相关全局变量
-    let currentCommentPage = 1;
-    const commentPageSize = 20;
-    let totalCommentPages = 0;
-
-    // --- 工具函数：格式化时间 ---
-    function formatCommentTime(timeStr) {
-      const date = new Date(timeStr);
-      const now = new Date();
-      const diff = now - date;
-      
-      // 计算时间差（秒/分/时/天）
-      const seconds = Math.floor(diff / 1000);
-      const minutes = Math.floor(seconds / 60);
-      const hours = Math.floor(minutes / 60);
-      const days = Math.floor(hours / 24);
-
-      if (days > 0) return `${days}天前`;
-      if (hours > 0) return `${hours}小时前`;
-      if (minutes > 0) return `${minutes}分钟前`;
-      return '刚刚';
-    }
-
-    // --- 评分相关函数（原有逻辑保留） ---
-    async function getSongRating() {
-      if (!songId) return;
-      const scoreLoading = document.getElementById('scoreLoading');
-      scoreLoading.style.display = 'inline';
-      
-      try {
-        const res = await axios.get(`http://localhost:3000/api/songs/${songId}/rating/average`, {
-          withCredentials: true
-        });
-        if (res.data.code === 200) {
-          const { averageScore, ratingCount } = res.data.data;
-          document.getElementById('averageScore').textContent = averageScore || '0.0';
-          document.getElementById('ratingCount').textContent = `${ratingCount || 0} 人参与`;
-        }
-      } catch (err) {
-        console.error('获取评分失败:', err);
-      } finally {
-        scoreLoading.style.display = 'none';
-      }
-    }
-
-    async function getUserCurrentRating() {
-      const token = localStorage.getItem('token');
-      if (!token || !songId) return;
-
-      try {
-        const res = await axios.get(`http://localhost:3000/api/user/songs/${songId}/rating`, {
+    try {
+      const reqUrl = `http://localhost:3000/api/${resourceType}s/${resourceId}/rating`;
+      console.log(`【评分功能】【提交评分】 请求地址=${reqUrl}, 请求参数={score:${selectedScore}}`);
+      const res = await axios.post(reqUrl, 
+        { score: selectedScore },
+        { 
           headers: { 'Authorization': `Bearer ${token}` },
-          withCredentials: true
-        });
-        if (res.data.code === 200 && res.data.data.score) {
-          selectedScore = res.data.data.score;
-          updateStarDisplay(selectedScore);
-          document.getElementById('ratingTip').textContent = `已评分：${selectedScore} 星 (可修改)`;
-          document.getElementById('ratingSubmit').disabled = false;
+          withCredentials: true 
         }
-      } catch (err) {
-        // 用户未评分会报404，此处静默处理
+      );
+      console.log(`【评分功能】【提交评分】 请求成功，响应数据=`, res.data);
+
+      if (res.data.code === 200) {
+        console.log(`【评分功能】【提交评分】 评分提交成功`);
+        tip.textContent = "评分成功！正在同步数据...";
+        setTimeout(async () => {
+          await getResourceRating();
+          submitBtn.textContent = "提交我的评分";
+          submitBtn.disabled = false;
+          tip.textContent = `已评分：${selectedScore} 星 (可修改)`;
+        }, 600);
       }
+    } catch (err) {
+      console.error(`【评分功能】【提交评分】 评分失败，错误详情=`, err);
+      alert("评分失败，请稍后再试");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "提交我的评分";
     }
+  };
+  console.groupEnd();
+}
 
-    function updateStarDisplay(score) {
-      const stars = document.querySelectorAll('.star');
-      stars.forEach(s => {
-        s.classList.toggle('active', parseFloat(s.dataset.score) <= score);
-      });
+// ========== 评论点赞核心函数 【重点日志区域 重中之重】 ==========
+/**
+ * 处理评论/回复点赞逻辑（修复：未登录禁止任何点赞/取消点赞操作，无token不可修改任何状态）
+ * @param {string} commentId - 评论/回复ID
+ * @param {HTMLElement} likeBtn - 点赞按钮DOM元素
+ * @param {HTMLElement} heartIcon - 红心图标DOM元素
+ * @param {HTMLElement} likeCountEl - 点赞数显示DOM元素
+ */
+
+async function handleCommentLike(commentId, likeBtn, heartIcon, likeCountEl) {
+  // ========== 开启分组日志，点赞全链路日志 ==========
+  console.group(`【点赞核心】【点赞操作】 开始执行点赞/取消点赞，目标ID=${commentId}`);
+  // ========== 重点TOKEN日志 - 最核心校验 ==========
+  const token = localStorage.getItem('music_user_token');
+  const desensitizeToken = token ? `${token.slice(0,8)}****${token.slice(-8)}` : '无TOKEN';
+  console.log(`【点赞核心】【TOKEN校验】 本地TOKEN=${desensitizeToken}, TOKEN是否存在=${!!token}`);
+  
+  // 🔥 核心修复1：强化权限校验，未登录（无token）时，直接禁止所有操作（包括UI乐观更新）
+  if (!token) {
+    console.error(`【点赞核心】【TOKEN校验】 TOKEN为空，用户未登录，禁止点赞操作，弹出错误提示`);
+    showCommentTip('请先登录后再进行点赞/取消点赞操作', 'error');
+    likeBtn.disabled = true;
+    likeBtn.style.cursor = 'not-allowed';
+    likeBtn.style.opacity = '0.6';
+    console.groupEnd();
+    return;
+  }
+  console.log(`【点赞核心】【TOKEN校验】 TOKEN有效，用户已登录，继续执行点赞逻辑`);
+
+  // 修复点1：将点赞数字转为合法数字（避免NaN），设置默认值0，防止负数
+  const currentLikeCount = parseInt(likeCountEl.textContent || '0', 10);
+  console.log(`【点赞核心】【数据转换】 原始点赞数文本=${likeCountEl.textContent}, 转换后数字=${currentLikeCount}, 是否为数字=${!isNaN(currentLikeCount)}`);
+  if (isNaN(currentLikeCount)) {
+    console.warn(`【点赞核心】【数据转换】 点赞数转换失败为NaN，重置为0`);
+    likeCountEl.textContent = '0';
+    console.groupEnd();
+    return;
+  }
+
+  // 1. 乐观更新UI（仅当有token时才执行，未登录已被提前拦截）
+  const isCurrentlyLiked = heartIcon.classList.contains('liked');
+  const newLikeCount = isCurrentlyLiked ? Math.max(0, currentLikeCount - 1) : currentLikeCount + 1;
+  console.log(`【点赞核心】【乐观更新】 当前点赞状态=${isCurrentlyLiked ? '已点赞' : '未点赞'}, 原点赞数=${currentLikeCount}, 乐观更新后=${newLikeCount}`);
+  
+  
+  likeCountEl.textContent = newLikeCount;
+  likeBtn.disabled = true;
+  console.log(`【点赞核心】【乐观更新】 UI更新完成，按钮暂时禁用`);
+
+  try {
+    // 发起点赞接口请求
+    const reqUrl = `http://localhost:3000/api/comments/${commentId}/like`;
+    console.log(`【点赞核心】【接口请求】 请求地址=${reqUrl}, 请求方式=POST, 请求体={}`);
+    const res = await axios.post(
+      reqUrl,
+      {},
+      {
+        withCredentials: true,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    console.log(`【点赞核心】【接口响应】 请求成功，响应状态=${res.status}, 响应完整数据=`, res.data);
+
+    if (res.data.code === 200) {
+      const { isLiked, likeCount } = res.data.data;
+      const finalLikeCount = parseInt(likeCount || '0', 10);
+      console.log(`【点赞核心】【接口响应】 解析后端数据：最终点赞状态=${isLiked}, 后端返回点赞数=${finalLikeCount}`);
+      
+      // 同步后端返回的最终状态
+      heartIcon.classList.toggle('liked', isLiked);
+      console.log(`【点赞核心】【状态同步】 同步后端点赞状态完成，红心样式更新为=${isLiked}`);
+      
+      // 仅当后端返回数据非法时，才重置点赞数
+      if (isNaN(finalLikeCount)) {
+        console.warn(`【点赞核心】【数据异常】 后端返回点赞数非法为NaN，重置为0`);
+        likeCountEl.textContent = '0';
+      }
+    } else {
+      console.warn(`【点赞核心】【接口响应】 接口返回业务失败，code=${res.data.code}, msg=${res.data.msg}`);
+      showCommentTip(`点赞失败：${res.data.msg}`, 'error');
     }
+  } catch (err) {
+    console.error(`【点赞核心】【接口异常】 点赞接口请求失败，完整错误信息=`, err);
+    console.log(`【点赞核心】【回滚操作】 请求失败，执行UI状态回滚`);
+    // 回滚UI状态
+    heartIcon.classList.toggle('liked', isCurrentlyLiked);
+    likeCountEl.textContent = currentLikeCount;
+    showCommentTip('点赞失败，请稍后重试', 'error');
+  } finally {
+    // 登录状态下，操作完成后恢复按钮可用
+    if (token) {
+      likeBtn.disabled = false;
+      likeBtn.style.cursor = 'pointer';
+      likeBtn.style.opacity = '1';
+      console.log(`【点赞核心】【操作完成】 点赞流程结束，恢复按钮可用状态`);
+    }
+    console.groupEnd();
+  }
+}
 
-    function initRatingSystem() {
-      const stars = document.querySelectorAll('.star');
-      const submitBtn = document.getElementById('ratingSubmit');
-      const tip = document.getElementById('ratingTip');
-      const token = localStorage.getItem('token');
+// ========== 回复相关函数 【重点日志区域 回复全链路】 ==========
+/**
+ * 加载指定父评论的子评论（调用接口）
+ * @param {string} commentId - 父评论ID
+ * @param {number} page - 页码，默认1
+ * @param {number} pageSize - 每页数量，默认10（最大50）
+ * @returns {Promise<Object>} 子评论数据（包含parentComment、replies、pagination）
+ */
 
-      if (!token) {
-        tip.innerHTML = '<a href="login.html" style="color:var(--primary)">请先登录后再评分</a>';
+async function loadCommentReplies(commentId, page = 1, pageSize = 10) {
+  console.group(`【回复功能】【加载回复】 开始加载父评论的回复列表，父评论ID=${commentId}`);
+  console.log(`【回复功能】【加载回复】 请求参数：page=${page}, pageSize=${pageSize}`);
+  console.log(`vvvvvvv=${commentId}`);
+  try {
+    // 限制pageSize最大为50（接口要求）
+    const reqParams = { 
+  sortBy: 'like',    // 按点赞数排序
+  order: 'desc'      // 降序排列
+};
+    const safePageSize = Math.min(pageSize, 50);
+    const reqUrl = `http://localhost:3000/api/comments/${commentId}/replies?page=${page}&pageSize=${safePageSize}`;
+    console.log(`【回复功能】【加载回复】 请求地址=${reqUrl}`);
+    const response = await axios.get(reqUrl, {
+      params: reqParams,
+      withCredentials: true,
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    console.log(`【回复功能】【加载回复】 请求成功，响应状态=${response.status}, 响应数据=`, response.data);
+    
+    if (response.data.code === 200) {
+      const replyCount = response.data.data.pagination?.total || 0;
+      console.log(`【回复功能】【加载回复】 加载成功，共${replyCount}条回复数据`);
+      console.groupEnd();
+      return response.data.data;
+    } else {
+      console.warn(`【回复功能】【加载回复】 加载失败，业务错误=${response.data.msg}`);
+      showCommentTip(`加载回复失败: ${response.data.msg}`, 'error');
+      console.groupEnd();
+      return null;
+    }
+  } catch (error) {
+    console.error(`【回复功能】【加载回复】 加载子评论接口请求失败，错误详情=`, error);
+    showCommentTip(`加载回复失败：请求地址不存在或后端未实现\n${error.config?.url || '未知地址'}`, 'error');
+    console.groupEnd();
+    return null;
+  }
+}
+// 正确获取父评论ID的完整代码
+
+
+// 调用示例
+
+/**
+ * 切换回复表单显示/隐藏
+ * @param {string} commentId - 评论ID
+ * @param {string} replyToName - 回复目标用户名
+ */
+function toggleReplyForm(commentId, replyToName ) {
+  console.log(`【回复功能】【表单切换】 切换回复表单显隐，评论ID=${commentId}, 回复目标用户=${replyToName || '无'}`);
+  const commentItem = document.querySelector(`.comment-item[data-comment-id="${commentId}"]`);
+  if (!commentItem) {
+    console.warn(`【回复功能】【表单切换】 未找到评论DOM元素，评论ID=${commentId}`);
+    return;
+  }
+
+  const replyForm = commentItem.querySelector('.reply-form');
+  const replyInput = replyForm.querySelector('.reply-input');
+  const replyLengthTip = replyForm.querySelector('.reply-length-tip');
+
+  // 切换显示状态
+  const isShow = !replyForm.classList.contains('show');
+  replyForm.classList.toggle('show');
+  console.log(`【回复功能】【表单切换】 表单最终状态=${isShow ? '显示' : '隐藏'}`);
+
+  // 初始化输入框（含@用户）
+  if (isShow) {
+    //const repliesList = commentItem.querySelector('.replies-list');
+    //if (repliesList) repliesList.classList.add('show');
+    console.log(`【回复功能】【表单切换】 表单显示，自动展开回复列表`);
+    
+    const placeholder = replyToName ? `回复 @${replyToName}（1-500字）...` : '输入回复内容（1-500字）...';
+    replyInput.placeholder = placeholder;
+    replyInput.value = replyToName ? `@${replyToName} ` : '';
+    replyLengthTip.textContent = `${replyInput.value.length}/500`;
+    replyInput.focus();
+  console.log('replyToName2', replyToName);
+    // 绑定字数统计
+    replyInput.addEventListener('input', function() {
+      const length = this.value.trim().length;
+      replyLengthTip.textContent = `${length}/500`;
+      const submitBtn = replyForm.querySelector('.reply-submit-btn');
+      submitBtn.disabled = length < 1 || length > 500;
+    });
+  } else {
+    // 隐藏时清空输入框
+    replyInput.value = '';
+    console.log(`【回复功能】【表单切换】 表单隐藏，清空输入框内容`);
+  }
+}
+
+/**
+ * 切换回复列表的展开/折叠状态
+ * @param {HTMLElement} toggleBtn - 切换按钮DOM元素
+ * @param {HTMLElement} repliesList - 回复列表容器
+ * @param {number} replyCount - 回复总数
+ */
+function toggleRepliesList(toggleBtn, repliesList, replyCount) {
+  const isShow = repliesList.classList.toggle('show');
+  console.log(`【回复功能】【列表切换】 回复列表状态=${isShow ? '展开' : '折叠'}, 回复总数=${replyCount}`);
+  // 更新按钮文本
+  if (isShow) {
+    toggleBtn.innerHTML = `<span>📥</span><span>收起回复(${replyCount})</span>`;
+  } else {
+    toggleBtn.innerHTML = `<span>📤</span><span>展开回复(${replyCount})</span>`;
+  }
+}
+
+/**
+ * 处理回复提交（乐观更新）【回复核心函数 重点日志】
+ * @param {string} commentId - 父评论ID
+ * @param {HTMLElement} replyForm - 回复表单DOM元素
+ */
+async function handleReplySubmit(commentId, replyForm) {
+  console.group(`【回复功能】【提交回复】 开始提交回复，父评论ID=${commentId}`);
+  // ========== 重点TOKEN日志 ==========
+  const token = localStorage.getItem('music_user_token');
+  const desensitizeToken = token ? `${token.slice(0,8)}****${token.slice(-8)}` : '无TOKEN';
+  console.log(`【回复功能】【提交回复】 TOKEN=${desensitizeToken}, TOKEN是否存在=${!!token}`);
+
+  if (!token) {
+    console.error(`【回复功能】【提交回复】 TOKEN为空，用户未登录，禁止发布回复`);
+    showCommentTip('请先登录后再发布回复', 'error');
+    console.groupEnd();
+    return;
+  }
+
+  const replyInput = replyForm.querySelector('.reply-input');
+  const replySubmitBtn = replyForm.querySelector('.reply-submit-btn');
+  const replyContent = replyInput.value.trim();
+  console.log(`【回复功能】【提交回复】 回复内容=${replyContent}, 内容长度=${replyContent.length}`);
+
+  // 验证内容长度
+  if (replyContent.length < 1 || replyContent.length > 500) {
+    console.warn(`【回复功能】【提交回复】 内容长度校验失败，长度=${replyContent.length}，要求1-500字`);
+    showCommentTip('回复内容请控制在1-500字之间', 'error');
+    console.groupEnd();
+    return;
+  }
+
+  // 获取当前用户信息（缓存优先）
+  let user = getUserFromCache();
+  if (!user) {
+    console.log(`【回复功能】【提交回复】 无用户缓存，请求最新用户信息`);
+    user = await getCurrentUserInfo();
+    if (!user) {
+      console.error(`【回复功能】【提交回复】 用户信息失效，清除TOKEN并跳转登录`);
+      showCommentTip('用户信息失效，请重新登录', 'error');
+      localStorage.removeItem('music_user_token');
+      clearUserCache();
+      setTimeout(() => location.href = "login.html", 1000);
+      console.groupEnd();
+      return;
+    }
+  }
+  console.log(`【回复功能】【提交回复】 获取到用户信息=`, user);
+
+  // 提取@目标用户（简化处理）
+  let replyToName = '';
+  let replyToUserId = '';
+  if (replyInput.value.startsWith('@')) {
+    const match = replyInput.value.match(/@([^\s]+)\s/);
+    if (match) {
+      replyToName = match[1];
+      replyToUserId = commentId + '_' + replyToName;
+    }
+  }
+  console.log(`【回复功能】【提交回复】 回复目标用户=${replyToName}, 目标用户ID=${replyToUserId}`);
+
+  const tempReplyId = `temp_${Date.now()}`;
+  console.log(`【回复功能】【提交回复】 生成临时回复ID=${tempReplyId}，开始乐观更新UI`);
+
+  // 1. 构建临时回复数据（乐观更新用）
+  const tempReply = {
+    _id: tempReplyId,
+    username: user.username,
+    nick_name: user.nick_name,
+    avatar: user.avatar,
+    content: replyContent,
+    likeCount: 0,
+    likedByMe: false,
+    parent_id: commentId,
+    reply_to_user_id: replyToUserId,
+    reply_to_name: replyToName,
+    createdAt: new Date().toISOString(),
+    isTemp: true
+  };
+
+  // 2. 乐观更新UI：添加临时回复到列表
+  const commentItem = document.querySelector(`.comment-item[data-comment-id="${commentId}"]`);
+  if (!commentItem) {
+    console.error(`【回复功能】【提交回复】 未找到父评论DOM元素，评论ID=${commentId}`);
+    showCommentTip('评论项不存在，无法发布回复', 'error');
+    console.groupEnd();
+    return;
+  }
+
+  let repliesList = commentItem.querySelector('.replies-list');
+  const emptyRepliesTip = commentItem.querySelector('.empty-replies-tip');
+  let isNewRepliesList = false;
+  if (!repliesList) {
+    isNewRepliesList = true;
+    repliesList = document.createElement('div');
+    repliesList.className = 'replies-list';
+    if (emptyRepliesTip) {
+      emptyRepliesTip.parentNode.replaceChild(repliesList, emptyRepliesTip);
+    } else {
+      const commentActions = commentItem.querySelector('.comment-actions');
+      if (commentActions) {
+        commentActions.parentNode.insertBefore(repliesList, commentActions.nextSibling);
+      } else {
+        showCommentTip('评论操作栏不存在，无法发布回复', 'error');
+        console.groupEnd();
         return;
       }
+    }
+    console.log(`【回复功能】【提交回复】 未找到回复列表，新建回复列表容器`);
+  }
 
-      tip.textContent = "选择星级提交评分";
+  // 发布新回复时，自动展开回复列表
+  repliesList.classList.add('show');
+ if (emptyRepliesTip) emptyRepliesTip.style.display = 'none'; 
+  console.log(`【回复功能】【提交回复】 展开回复列表，隐藏空提示`);
 
-      stars.forEach(star => {
-        star.addEventListener('mouseenter', () => {
-          const hoverScore = star.dataset.score;
-          stars.forEach(s => s.classList.toggle('hover', s.dataset.score <= hoverScore));
-        });
+  // 渲染临时回复
+  const tempReplyEl = renderReplyItem(tempReply, repliesList, true);
+  console.log('aaaaaaaaaaaaaaaaaaaaa');
+  console.log(commentId);
+  console.log(`【回复功能】【提交回复】 临时回复渲染完成，DOM元素=`, tempReplyEl);
 
-        star.addEventListener('mouseleave', () => {
-          stars.forEach(s => s.classList.remove('hover'));
-        });
+  // 更新回复数量按钮的计数
+ const toggleBtn = commentItem.querySelector('.toggle-replies-btn');
+  if (toggleBtn) {
+    const currentCount = parseInt(toggleBtn.dataset.replyCount || '0', 10);
+    toggleBtn.dataset.replyCount = currentCount + 1;
+    // 🔥 修改：回复后保持展开状态，不自动变成收起状态
+    toggleBtn.innerHTML = `<span>📤</span><span>展开回复(${currentCount + 1})</span>`;
+    console.log(`【回复功能】【提交回复】 更新回复数量，原数量=${currentCount}，新数量=${currentCount+1}`);
+  }
 
-        star.addEventListener('click', () => {
-          selectedScore = star.dataset.score;
-          updateStarDisplay(selectedScore);
-          submitBtn.disabled = false;
-          tip.textContent = `准备提交：${selectedScore} 星`;
-        });
-      });
+  // 3. 清空回复输入框并禁用按钮
+  replyInput.value = '';
+  replyForm.querySelector('.reply-length-tip').textContent = '0/500';
+  replySubmitBtn.disabled = true;
+  replySubmitBtn.textContent = '发布中...';
+  console.log(`【回复功能【提交回复】 清空输入框，按钮置为发布中状态`);
+  console.log(`${commentId}`);
+  console.log('replyToName3', replyToName);
+  try {
+    // 4. 发送后端请求
+    const reqUrl = `http://localhost:3000/api/comments/${commentId}/reply`;
+    const reqData = { content: replyContent, reply_to_user_id: replyToUserId, reply_to_name: replyToName };
+    console.log(`【回复功能】【提交回复】 发起后端请求，地址=${reqUrl}, 请求参数=`, reqData);
+    const res = await axios.post(
+      reqUrl, reqData,
+      {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        withCredentials: true
+      }
+    );
+    console.log(`【回复功能】【提交回复】 请求成功，响应状态=${res.status}, 响应数据=`, res.data);
 
-      submitBtn.onclick = async () => {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "提交中...";
-        
-        try {
-          const res = await axios.post(`http://localhost:3000/api/songs/${songId}/rating`, 
-            { score: selectedScore },
-            { 
-              headers: { 'Authorization': `Bearer ${token}` },
-              withCredentials: true 
-            }
-          );
+    if (res.data.code === 200) {
+      const { commentId: realReplyId, parent_id: realParentId = commentId } = res.data.data;
+      const a = res.data.data.replyId;
+      console.log(a);
+      console.log(res.data.data);
+      console.log(`【回复功能】【提交回复】 回复发布成功，真实回复ID=${realReplyId}, 真实父ID=${realParentId}`);
+      showCommentTip('回复发布成功！');
 
-          if (res.data.code === 200) {
-            tip.textContent = "评分成功！正在同步数据...";
-            // 关键：延迟 500ms 刷新，给后端数据库更新留出缓冲时间
-            setTimeout(async () => {
-              await getSongRating();
-              submitBtn.textContent = "提交我的评分";
-              submitBtn.disabled = false;
-              tip.textContent = `已评分：${selectedScore} 星 (可修改)`;
-            }, 600);
-          }
-        } catch (err) {
-          alert("评分失败，请稍后再试");
-          submitBtn.disabled = false;
-          submitBtn.textContent = "提交我的评分";
+      // 关键修复：替换临时回复ID为真实ID
+      const tempReplyEl = repliesList.querySelector(`.reply-item[data-reply-id="${tempReplyId}"]`);
+      if (tempReplyEl) {
+        tempReplyEl.dataset.replyId = realReplyId;
+        tempReplyEl.dataset.parentId = realParentId;
+        const likeBtn = tempReplyEl.querySelector(`.like-btn[data-reply-id="${tempReplyId}"]`);
+        if (likeBtn) {
+          likeBtn.dataset.replyId = a;
+          likeBtn.dataset.parentId = realParentId;
         }
-      };
+        tempReplyEl.classList.remove('temp-reply');
+        tempReplyEl.setAttribute('data-parent-comment-id', realParentId);
+        console.log(`【回复功能】【提交回复】 临时回复ID替换完成，更新为真实ID=${realReplyId}`);
+      }
+
+      // 隐藏回复表单
+      replyForm.classList.remove('show');
+      console.log(`【回复功能】【提交回复】 隐藏回复表单`);
+    }
+  } catch (err) {
+    console.error(`【回复功能】wq【提交回复】 回复发布失败，错误详情=`, err);
+    // 6. 请求失败，回滚UI：移除临时回复
+    const tempReplyEl = repliesList.querySelector(`.reply-item[data-reply-id="${tempReplyId}"]`);
+    if (tempReplyEl) tempReplyEl.remove();
+    console.log(`【回复功能】【提交回复】 请求失败，回滚UI，移除临时回复`);
+
+    // 回滚回复数量计数
+    if (toggleBtn) {
+      const currentCount = parseInt(toggleBtn.dataset.replyCount || '1', 10);
+      const newCount = Math.max(0, currentCount - 1);
+      toggleBtn.dataset.replyCount = newCount;
+      toggleBtn.innerHTML = newCount > 0 ? `<span>📤</span><span>展开回复(${newCount})</span>` : `<span>📤</span><span>展开回复</span>`;
+      console.log(`【回复功能】【提交回复】 回滚回复数量，原数量=${currentCount}，新数量=${newCount}`);
     }
 
-    // --- 新增：评论相关函数 ---
-    /**
-     * 加载评论列表
-     * @param {number} page - 页码
-     */
-    async function loadComments(page = 1) {
-      if (!songId) return;
+    // 修复失败后恢复“暂无回复”提示的逻辑
+    if (repliesList.children.length === 0) {
+      if (emptyRepliesTip && isNewRepliesList) {
+        repliesList.parentNode.replaceChild(emptyRepliesTip, repliesList);
+      } else if (emptyRepliesTip) {
+        emptyRepliesTip.style.display = 'block';
+      }
+      repliesList.classList.remove('show');
+      console.log(`【回复功能】【提交回复】 回复列表为空，恢复空提示并折叠列表`);
+    }
+
+    showCommentTip('回复发布失败，请稍后再试', 'error');
+  } finally {
+    // 恢复按钮状态
+    replySubmitBtn.textContent = '发布回复';
+    replySubmitBtn.disabled = false;
+    console.log(`【回复功能】【提交回复】 回复流程结束，恢复按钮状态`);
+    console.groupEnd();
+  }
+}
+
+
+/**
+ * 渲染回复头部（区分：回复楼主 / 回复某人）
+ */
+function renderReplyHeader(reply) {
+  // 兼容后端所有空值情况：空字符串/undefined/null 都判定为【回复父评论/楼主】
+  if (!reply.reply_to_user_id || reply.reply_to_user_id === '' || reply.reply_to_user_id === 'null' || reply.reply_to_user_id === 'undefined') {
+    const userName = reply.nick_name || reply.username || '匿名用户';
+    return `<span class="reply-nickname">${userName}</span>`;
+  }
+  // 有值 = 回复某条回复/某个用户，正常渲染@
+  const userName = reply.nick_name || reply.username || '匿名用户';
+  const replyToName = reply.reply_to_name || '匿名用户';
+  console.log('replyToName1', replyToName);
+  return `
+    <span class="reply-nickname">${userName}</span>
+    <span class="reply-to">回复</span>
+    <span class="reply-at-user">@${replyToName}</span>
+  `;
+
+}
+
+
+function renderReplyItem(reply, container, insertToTop = false) {
+  console.group(`【回复渲染】【子回复渲染】 开始渲染单条回复，回复ID=${reply._id}, 父评论ID=${reply.parent_id}`);
+  if (!reply || !container) {
+    console.error(`【回复渲染】【子回复渲染】 回复数据或容器为空，终止渲染`);
+    console.groupEnd();
+    return null;
+  }
+
+  // ========== ✅【新增核心方法】严格按你的要求实现 - 区分回复类型渲染头部 ==========
+
+  // 创建回复DOM节点
+  const replyItem = document.createElement('div');
+  replyItem.className = `reply-item ${reply.isTemp ? 'temp-reply' : ''}`;
+  replyItem.dataset.replyId = reply._id;
+  replyItem.dataset.parentId = reply.parent_id;
+
+  // 获取当前缓存用户，判断是否是自己的回复
+// ========== ✅ 完美复刻父评论头像写法【原生DOM创建，零语法错误】 ==========
+const cacheUser = getUserFromCache();
+const isCurrentUserReply = cacheUser && cacheUser.username === reply.username;
+const userName = isCurrentUserReply ? cacheUser.nick_name : (reply.nick_name || reply.username || "匿名用户");
+const avatarUrl = isCurrentUserReply ? cacheUser.avatar : reply.avatar;
+
+// 创建头像容器【和父评论完全一致的写法】
+const avatarDiv = document.createElement("div");
+avatarDiv.className = "reply-avatar"; // 注意这里是 reply-avatar 对应回复的样式，父评论是 comment-avatar
+if (avatarUrl) {
+  const img = document.createElement("img");
+  img.src = avatarUrl;
+  img.alt = `${userName}的头像`;
+  img.onerror = () => {
+    avatarDiv.innerHTML = getDefaultAvatar(userName);
+  };
+  avatarDiv.appendChild(img);
+} else {
+  avatarDiv.innerHTML = getDefaultAvatar(userName);
+}
+
+  // ✅【修复】彻底删除原有的content里的@拼接逻辑，避免重复渲染，内容原样展示即可
+  let replyContent = reply.content || '无内容';
+
+  // 修复：回复点赞数默认值0，避免NaN
+  const replyLikeCount = parseInt(reply.likeCount || '0', 10);
+
+  // ✅【核心修改】只改 reply-header 内部的内容，其余HTML结构、样式类名、属性完全不变！！！
+// 1. 先清空replyItem，再创建内容容器，去掉头像的字符串插值
+async function like() {
+
+  try{  
+    console.log(reply);
+    const isLiked = await checkCommentLikeStatus(reply._id);
+  reply.likedByMe = isLiked;}
+  catch(e){console.error('评论加载失败',err)}
+  replyItem.innerHTML = `
+  <div class="reply-content-wrapper">
+    <div class="reply-header">
+      ${renderReplyHeader(reply)}
+      <span class="reply-time">${formatCommentTime(reply.createdAt)}</span>
+    </div>
+    <div class="reply-content">${replyContent}</div>
+    <div class="reply-actions">
+      <button class="like-btn" data-reply-id="${reply._id}">
+        <span class="heart-icon ${reply.likedByMe ? 'liked' : ''}">❤️</span>
+        <span class="reply-like-count">${isNaN(replyLikeCount) ? 0 : replyLikeCount}</span>
+      </button>
+      <button class="reply-btn reply-to-reply-btn" data-reply-id="${reply._id}" data-parent-id="${reply.parent_id}" data-reply-to="${userName}">
+        <span>💬</span><span>回复</span>
+      </button>
+    </div>
+  </div>
+`;
+
+// 2. 原生追加头像节点到最前面 【和父评论完全一致的appendChild逻辑】
+replyItem.insertBefore(avatarDiv, replyItem.firstChild);
+
+  // 插入到容器的顶部/底部
+  if (insertToTop) {
+    container.insertBefore(replyItem, container.firstChild);
+    replyItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    container.appendChild(replyItem);
+  }
+
+  // ========== 绑定回复的点赞事件 ==========
+  const likeBtn = replyItem.querySelector(`.like-btn[data-reply-id="${reply._id}"]`);
+  const heartIcon = replyItem.querySelector('.heart-icon');
+  const likeCountEl = replyItem.querySelector('.reply-like-count');
+  if (likeBtn && heartIcon && likeCountEl) {
+    likeBtn.addEventListener('click', () => {
+      const realReplyId = likeBtn.dataset.replyId;
+      handleCommentLike(realReplyId, likeBtn, heartIcon, likeCountEl);
+    });
+    heartIcon.classList.toggle('liked', reply.likedByMe);
+    console.log(`【回复渲染】【子回复渲染】 回复点赞事件绑定完成，回复ID=${reply._id}`);
+  }
+
+  // ========== 绑定回复的回复按钮事件 ==========
+  const replyBtn = replyItem.querySelector('.reply-to-reply-btn');
+  if (replyBtn) {
+    replyBtn.addEventListener('click', () => {
+const parentId = replyBtn.dataset.parentId;
+const replyToName = replyBtn.dataset.replyTo;
+toggleReplyForm(parentId, replyToName);
+    });
+    console.log(`【回复渲染】【子回复渲染】 回复的回复按钮事件绑定完成`);
+  }
+
+  console.log(`【回复渲染】【子回复渲染】 回复渲染完成，DOM元素插入成功`);
+  console.groupEnd();
+  return replyItem;
+}
+like();
+};
+
+// ========== 评论列表与渲染相关函数 ==========
+/**
+ * 加载评论列表
+ * @param {number} page - 页码
+ */
+async function loadComments(page = 1) {
+  console.group(`【评论列表】【加载列表】 开始加载评论列表，页码=${page}, 每页条数=${commentPageSize}`);
+  const list = document.getElementById("commentsList");
+  const loading = document.getElementById("commentsLoading");
+  const empty = document.getElementById("emptyComments");
+
+  loading.style.display = "block";
+  list.style.display = "none";
+  empty.style.display = "none";
+
+  try {
+    const reqUrl = `http://localhost:3000/api/${resourceType}s/${resourceId}/comments`;
+const reqParams = { 
+    page, 
+    pageSize: commentPageSize,
+    sortBy: 'like',    // 按点赞数排序
+    order: 'desc'      // 降序排列
+  }; 
+  
+  console.log(`【评论列表】【加载列表】 请求地址=${reqUrl}, 请求参数=`, reqParams); 
+  
+  const res = await axios.get(reqUrl, { 
+    params: reqParams, 
+    withCredentials: true, 
+    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } 
+  });
+   
+    console.log(`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa【评论列表】【加载列表】 请求成功，响应数据=${resourceType}s/${resourceId}`, res.data);
+    
+
+    const { comments, pagination } = res.data.data;
+    console.log(`【评论列表】【加载列表】 原始评论数据共${comments.length}条=`, comments);
+    
+    document.getElementById("commentsTotalCount").textContent = `${pagination.total || 0} 条评论`;
+    totalCommentPages = pagination.totalPages || 0;
+    console.log(`【评论列表】【加载列表】 评论总数=${pagination.total}, 总页数=${totalCommentPages}`);
+
+    list.innerHTML = "";
+
+    // 筛选仅父评论（子评论通过接口单独加载）
+    const parentComments = comments.filter(comment => {
+      return !comment.parent_id || comment.parent_id === 'null' || comment.parent_id === 'undefined';
+    });
+    console.log(`【评论列表】【加载列表】 筛选后父评论共${parentComments.length}条`);
+
+    if (parentComments.length === 0) {
+      console.log(`【评论列表】【加载列表】 无父评论，显示空提示`);
+      empty.style.display = "block";
+      list.style.display = "none";
+      console.groupEnd();
+      return;
+    }
+    // 渲染所有父评论
+    parentComments.forEach(parentComment => {
+      parentComment.parent_id = null;
+      console.log(`【评论列表】【加载列表】 加载子评论，父评论ID=${parentComment._id}, 子评论共${parentComment.replies_total}条`);
+
+      renderCommentItem(parentComment);
+    });
+    console.log(`YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY【评论列表】【加载列表】 父评论渲染完成`);
+
+    list.style.display = "block";
+    empty.style.display = "none";
+    renderCommentsPagination();
+    console.log(`【评论列表】【加载列表】 分页渲染完成`);
+  } catch (err) {
+    console.error(`【评论列表】【加载列表】 加载评论失败，错误详情=`, err);
+    loading.textContent = '加载评论失败，请刷新重试';
+    empty.style.display = "none";
+    showCommentTip('加载评论失败，请刷新重试', 'error');
+  } finally {
+    loading.style.display = "none";
+    console.groupEnd();
+  }
+}
+// 查询单个评论的点赞状态
+async function checkCommentLikeStatus(commentId) {
+  try {
+    // 获取用户token（从localStorage或cookie中获取）
+   const token = localStorage.getItem('music_user_token');
+    
+    if (!token) {
+      console.warn('用户未登录，无法查询点赞状态');
+      return false;
+    }
+console.log(`xxxxxxx=${commentId}的点赞状态`);
+    const response = await axios.get(`http://localhost:3000/api/comments/${commentId}/like/status`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return response.data.data.isLiked; // true: 已点赞, false: 未点赞
+  } catch (error) {
+    if (error.response && error.response.status === 401) {
+      console.warn('用户认证失败，请重新登录');
+      // 可以在这里触发重新登录逻辑
+      handleAuthError();
+    } else {
+      console.error('查询点赞状态失败:', error);
+      console.log(`xxxxxxx=${commentId}的点赞状态`);
+    }
+    return false;
+  }
+}
+
+// 辅助函数：从cookie获取token
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+
+// 认证错误处理函数
+function handleAuthError() {
+  // 清除本地存储的token
+  localStorage.removeItem('userToken');
+  // 可以跳转到登录页或显示登录弹窗
+  showLoginModal();
+}
+
+const lsID = '';
+/**
+ * 渲染单条评论（含点赞、回复列表、回复表单）
+ * @param {Object} comment - 评论数据
+ * @param {boolean} insertToTop - 是否插入到列表顶部
+ */
+async function renderCommentItem(comment, insertToTop = false) {
+  // 校验父评论的parent_id
+  if (comment.parent_id !== null && comment.parent_id !== undefined) {
+    console.error(`【评论渲染】【父评论渲染】 渲染错误：非父评论数据被传入，comment=`, comment);
+    return;
+  }
+  console.log(`【评论渲染】【父评论渲染】 开始渲染单条父评论，评论ID=${comment._id}, 是否插入顶部=${insertToTop}`);
+
+  const list = document.getElementById("commentsList");
+  const empty = document.getElementById("emptyComments");
+  empty.style.display = "none";
+  list.style.display = "block";
+
+  const item = document.createElement("div");
+  item.className = `comment-item ${comment.isTemp ? 'temp-comment' : ''}`;
+  item.dataset.commentId = comment._id;
+
+  // 优先使用缓存的当前用户信息
+  const cacheUser = getUserFromCache();
+  const isCurrentUserComment = cacheUser && cacheUser.username === comment.username;
+  const name = isCurrentUserComment ? cacheUser.nick_name : (comment.nick_name || comment.username || "匿名用户");
+  const avatarUrl = isCurrentUserComment ? cacheUser.avatar : comment.avatar;
+
+  const avatar = document.createElement("div");
+  avatar.className = "comment-avatar";
+  if (avatarUrl) {
+    const img = document.createElement("img");
+    img.src = avatarUrl;
+    img.alt = `${name}的头像`;
+    img.onerror = () => {
+      avatar.innerHTML = getDefaultAvatar(name);
+    };
+    avatar.appendChild(img);
+  } else {
+    avatar.innerHTML = getDefaultAvatar(name);
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "comment-content-wrapper";
+
+  // 计算回复数量
+  const replyCount = parseInt(comment.replies ? comment.replies.length : comment.replies_total || '0', 10);
+
+  
+  // 构建展开/折叠回复按钮
+  let toggleBtnHtml = '';
+  if (replyCount > 0) {
+    toggleBtnHtml = `
+      <button class="reply-btn toggle-replies-btn" data-comment-id="${comment._id}" data-reply-count="${replyCount}">
+        <span>📤</span>
+        <span>展开回复(${comment.replies_total || 0})</span>
+      </button>
+    `;
+  } else{
+        toggleBtnHtml = `
+      <button class="reply-btn toggle-replies-btn" data-comment-id="${comment._id}" data-reply-count="${replyCount}">
+      </button>
+    `;
+  }
+
+  // 修复：评论点赞数默认值0，避免空值
+  const commentLikeCount = parseInt(comment.likeCount || '0', 10);
+  // 查询评论点赞状态
+  const isLiked = await checkCommentLikeStatus(comment._id);
+  comment.likedByMe = isLiked;
+  // 构建评论内容
+  wrapper.innerHTML = `
+    <div class="comment-header">
+      <span class="comment-nickname">${name}</span>
+      <span class="comment-time">${formatCommentTime(comment.createdAt)}</span>
+    </div>
+    <div class="comment-content">${comment.content?.trim() || '无内容'}</div>
+    <div class="comment-actions">
+      <button class="like-btn" data-comment-id="${comment._id}">
+        <span class="heart-icon ${!comment.likedByMe ? 'liked' : ''}">❤️</span>
+        <span class="comment-like-count">${isNaN(commentLikeCount) ? 0 : commentLikeCount}</span>
+      </button>
+      <button class="reply-btn" data-comment-id="${comment._id}" data-reply-to="${name}">
+        <span>💬</span>
+        <span>回复</span>
+      </button>
+      ${toggleBtnHtml}
+    </div>
+    <div class="empty-replies-tip" style="padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;">
+    
+    </div>
+    <div class="reply-form">
+      <div class="reply-input-wrapper">
+        <textarea class="reply-input" maxlength="500"></textarea>
+      </div>
+      <div class="reply-form-footer">
+        <span class="reply-length-tip">0/500</span>
+        <div>
+          <button class="reply-cancel-btn">取消</button>
+          <button class="reply-submit-btn" disabled>发布回复</button>
+        </div>
+      </div>
+    </div>
+  `;
+  item.appendChild(avatar);
+  item.appendChild(wrapper);
+
+  // 插入到评论列表
+  insertToTop ? list.insertBefore(item, list.firstChild) : list.appendChild(item);
+console.log('UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU', comment);
+  // 滚动到新评论
+  if (insertToTop) {
+    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // ========== 绑定评论操作事件 ==========
+  // 1. 绑定评论点赞事件
+  const likeBtn = item.querySelector(`.like-btn[data-comment-id="${comment._id}"]`);
+  const heartIcon = item.querySelector('.heart-icon');
+  const likeCountEl = item.querySelector('.comment-like-count');
+
+  if (likeBtn && heartIcon && likeCountEl) {
+    likeBtn.addEventListener('click', () => {
+      const realCommentId = likeBtn.dataset.commentId;
+      handleCommentLike(realCommentId, likeBtn, heartIcon, likeCountEl);
+    });
+    heartIcon.classList.toggle('liked', comment.likedByMe);
+  }
+
+  // 2. 绑定回复按钮事件
+  const replyBtn = item.querySelector('.reply-btn:not(.toggle-replies-btn)');
+  const replyForm = item.querySelector('.reply-form');
+  const replyCancelBtn = replyForm.querySelector('.reply-cancel-btn');
+  const replySubmitBtn = replyForm.querySelector('.reply-submit-btn');
+
+  if (replyBtn) {
+    replyBtn.addEventListener('click', () => {
+      const realCommentId = replyBtn.dataset.commentId;
+      const replyToName = replyBtn.dataset.replyTo;
+      toggleReplyForm(realCommentId, replyToName);
+    });
+  }
+
+  if (replyCancelBtn) {
+    replyCancelBtn.addEventListener('click', () => {
+      const realCommentId = item.dataset.commentId;
+      toggleReplyForm(realCommentId);
+    });
+  }
+
+  if (replySubmitBtn) {
+    replySubmitBtn.addEventListener('click', () => {
+      const realCommentId = item.dataset.commentId;
+      handleReplySubmit(realCommentId, replyForm);
+    });
+  }
+
+  // 3. 绑定展开/折叠回复按钮事件
+// ... existing code ...
+  // 3. 绑定展开/折叠回复按钮事件
+  const toggleRepliesBtn = item.querySelector('.toggle-replies-btn');
+  
+  if (toggleRepliesBtn) {
+    // 获取回复数量
+    const replyCount = parseInt(toggleRepliesBtn.dataset.replyCount || '0', 10);
+    
+    // 🔥 修改：只有当回复数量大于0时才添加展开回复按钮
+      if (replyCount > 0) {
+      // 创建新的展开回复按钮
+      const expandRepliesBtn = document.createElement('button');
+      expandRepliesBtn.className = 'reply-btn toggle-replies-btn';
+      expandRepliesBtn.setAttribute('data-comment-id', toggleRepliesBtn.dataset.commentId);
+      expandRepliesBtn.setAttribute('data-reply-count', replyCount);
+      expandRepliesBtn.style.display = 'inline-block';
+      expandRepliesBtn.innerHTML = '<span>📤</span><span>展开回复(' + replyCount + ')</span>';
       
-      // 显示加载状态
-      document.getElementById('commentsLoading').style.display = 'block';
-      document.getElementById('commentsList').style.display = 'none';
-      document.getElementById('emptyComments').style.display = 'none';
-      document.getElementById('commentsPagination').style.display = 'none';
-
-      try {
-        const res = await axios.get(`http://localhost:3000/api/songs/${songId}/comments`, {
-          params: { page, pageSize: commentPageSize },
-          withCredentials: true
-        });
-
-        if (res.data.code === 200) {
-          const { comments, pagination } = res.data.data;
-          const { total, totalPages } = pagination;
-          
-          // 更新全局分页变量
-          currentCommentPage = page;
-          totalCommentPages = totalPages;
-
-          // 更新评论总数显示
-          document.getElementById('commentsTotalCount').textContent = `${total} 条评论`;
-
-          // 处理空评论
-          if (total === 0) {
-            document.getElementById('emptyComments').style.display = 'block';
-            document.getElementById('commentsLoading').style.display = 'none';
+      // 隐藏原来的展开回复按钮
+      toggleRepliesBtn.style.display = 'none';
+      
+      // 将新的展开回复按钮插入到原来展开按钮的位置
+      toggleRepliesBtn.parentNode.insertBefore(expandRepliesBtn, toggleRepliesBtn);
+      
+      // 绑定新的展开回复按钮事件
+      expandRepliesBtn.addEventListener('click', async () => {
+        const commentId = toggleRepliesBtn.dataset.commentId;
+        console.log(`【展开回复】开始加载评论 ${commentId} 的回复数据`);
+        
+        // 禁用按钮并显示加载状态
+        expandRepliesBtn.disabled = true;
+        expandRepliesBtn.innerHTML = '<span>⏳</span><span>加载中...</span>';
+        
+        try {
+          // 拉取后端数据
+          const replyData = await loadCommentReplies(commentId, 1, 10);
+          if (!replyData) {
+            showCommentTip('加载失败，请重试', 'error');
             return;
           }
-
-          // 渲染评论列表
-          const commentsListEl = document.getElementById('commentsList');
-          commentsListEl.innerHTML = '';
           
-          comments.forEach(comment => {
-            const commentItem = document.createElement('div');
-            commentItem.className = 'comment-item';
-            commentItem.innerHTML = `
-              <div class="comment-header">
-                <span class="comment-username">${comment.username}</span>
-                <span class="comment-time">${formatCommentTime(comment.createdAt)}</span>
-              </div>
-              <div class="comment-content">${comment.content}</div>
-            `;
-            commentsListEl.appendChild(commentItem);
-          });
-
-          // 显示评论列表和分页
-          commentsListEl.style.display = 'block';
-          renderCommentsPagination();
-        }
-      } catch (err) {
-        console.error('加载评论失败:', err);
-        document.getElementById('commentsLoading').textContent = '加载评论失败，请刷新重试';
-      } finally {
-        document.getElementById('commentsLoading').style.display = 'none';
-      }
-    }
-
-    /**
-     * 渲染评论分页控件
-     */
-    function renderCommentsPagination() {
-      const paginationEl = document.getElementById('commentsPagination');
-      paginationEl.innerHTML = '';                     
-      
-      // 上一页按钮
-      const prevBtn = document.createElement('button');
-      prevBtn.className = 'page-btn';
-      prevBtn.textContent = '←';
-      prevBtn.disabled = currentCommentPage === 1;
-      prevBtn.onclick = () => {
-        if (currentCommentPage > 1) {
-          loadComments(currentCommentPage - 1);
-        }
-      };
-      paginationEl.appendChild(prevBtn);
-
-      // 页码按钮（最多显示5个页码）
-      const startPage = Math.max(1, currentCommentPage - 2);
-      const endPage = Math.min(totalCommentPages, startPage + 4);
-      
-      for (let i = startPage; i <= endPage; i++) {
-        const pageBtn = document.createElement('button');
-        pageBtn.className = `page-btn ${i === currentCommentPage ? 'active' : ''}`;
-        pageBtn.textContent = i;
-        pageBtn.onclick = () => loadComments(i);
-        paginationEl.appendChild(pageBtn);
-      }
-
-      // 下一页按钮
-      const nextBtn = document.createElement('button');
-      nextBtn.className = 'page-btn';
-      nextBtn.textContent = '→';
-      nextBtn.disabled = currentCommentPage === totalCommentPages;
-      nextBtn.onclick = () => {
-        if (currentCommentPage < totalCommentPages) {
-          loadComments(currentCommentPage + 1);
-        }
-      };
-      paginationEl.appendChild(nextBtn);
-
-      // 显示分页控件
-      paginationEl.style.display = 'flex';
-    }
-
-    /**
-     * 初始化评论发布功能
-     */
-    function initCommentForm() {
-      const token = localStorage.getItem('token');
-      const commentLoginTip = document.getElementById('commentLoginTip');
-      const commentForm = document.getElementById('commentForm');
-      const commentContent = document.getElementById('commentContent');
-      const commentLengthTip = document.getElementById('commentLengthTip');
-      const commentSubmitBtn = document.getElementById('commentSubmitBtn');
-
-      // 未登录：显示登录提示
-      if (!token) {
-        commentLoginTip.style.display = 'block';
-        commentForm.style.display = 'none';
-        return;
-      }
-
-      // 已登录：显示评论输入框
-      commentLoginTip.style.display = 'none';
-      commentForm.style.display = 'block';
-
-      // 监听输入内容变化
-      commentContent.addEventListener('input', () => {
-        const content = commentContent.value.trim();
-        const length = content.length;
-        
-        // 更新字数提示
-        commentLengthTip.textContent = `${length}/500`;
-        
-        // 启用/禁用发布按钮（1-500字）
-        commentSubmitBtn.disabled = length < 1 || length > 500;
-      });
-
-      // 发布评论按钮点击事件
-      commentSubmitBtn.onclick = async () => {
-        const content = commentContent.value.trim();
-        if (!content || content.length < 1 || content.length > 500) return;
-
-        // 禁用按钮，防止重复提交
-        commentSubmitBtn.disabled = true;
-        commentSubmitBtn.textContent = '发布中...';
-
-        try {
-          const res = await axios.post(
-            `http://localhost:3000/api/songs/${songId}/comment`,
-            { content },
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              withCredentials: true
-            }
-          );
-
-          if (res.data.code === 200) {
-            alert('评论发布成功！');
-            // 清空输入框
-            commentContent.value = '';
-            commentLengthTip.textContent = '0/500';
-            // 刷新评论列表（回到第一页）
-            loadComments(1);
+          // 移除现有回复列表
+          const repliesList = item.querySelector('.replies-list');
+          const emptyRepliesTip = item.querySelector('.empty-replies-tip');
+          
+          if (repliesList) {
+            repliesList.remove();
           }
+          
+          // 创建新的回复列表
+          const newRepliesList = document.createElement('div');
+          newRepliesList.className = 'replies-list';
+          
+          if (emptyRepliesTip) {
+            emptyRepliesTip.parentNode.replaceChild(newRepliesList, emptyRepliesTip);
+          } else {
+            const commentActions = item.querySelector('.comment-actions');
+            if (commentActions) {
+              commentActions.parentNode.insertBefore(newRepliesList, commentActions.nextSibling);
+            }
+          }
+          
+          // 更新回复数量
+          const realReplyCount = parseInt(replyData.pagination?.total || '0', 10);
+          toggleRepliesBtn.dataset.replyCount = realReplyCount;
+          
+          // 渲染回复项
+          if (replyData.replies && replyData.replies.length > 0) {
+            replyData.replies.forEach(reply => {
+              if (!reply.parent_id || reply.parent_id !== commentId) {
+                reply.parent_id = commentId;
+              }
+              renderReplyItem(reply, newRepliesList, false);
+            });
+          } else {
+            const emptyTip = document.createElement('div');
+            emptyTip.className = 'empty-replies-tip';
+            emptyTip.style.cssText = 'padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;';
+            emptyTip.textContent = '';
+            newRepliesList.appendChild(emptyTip);
+          }
+          
+          // 自动展开回复列表
+          toggleRepliesList(toggleRepliesBtn, newRepliesList, realReplyCount);
+          
+          // 隐藏新的展开回复按钮，显示原来的展开回复按钮
+          expandRepliesBtn.style.display = 'none';
+          toggleRepliesBtn.style.display = 'inline-block';
+          console.log(`【展开回复】加载完成，显示原来的展开回复按钮`);
+          
+        
+          
         } catch (err) {
-          console.error('发布评论失败:', err);
-          alert('评论发布失败，请稍后再试');
+          console.error('加载回复列表失败:', err);
+          showCommentTip('加载失败，请重试', 'error');
         } finally {
           // 恢复按钮状态
-          commentSubmitBtn.disabled = false;
-          commentSubmitBtn.textContent = '发布评论';
+          expandRepliesBtn.disabled = false;
+          expandRepliesBtn.innerHTML = '<span>📤</span><span>展开回复(' + replyCount + ')</span>';
         }
-      };
+      });
     }
+    // 原来的展开/折叠回复按钮事件（保持不变）
+    toggleRepliesBtn.addEventListener('click', async () => {
+      const commentId = toggleRepliesBtn.dataset.commentId;
+      const repliesList = item.querySelector('.replies-list');
+      const emptyRepliesTip = item.querySelector('.empty-replies-tip');
+      const replyCount = parseInt(toggleRepliesBtn.dataset.replyCount || '0', 10);
 
-    // --- 页面加载主函数（原有逻辑+评论初始化） ---
-    async function loadPage() {
-      if (!songId) {
-        window.location.href = 'songs-list.html';
+      const hasTempReply = repliesList && repliesList.querySelector('.temp-reply');
+      const needsReload = !repliesList || hasTempReply;
+
+      if (repliesList && !needsReload) {
+        // 已有完整数据，直接切换显示状态
+        console.log('repliesList.children[0]', repliesList.children[0]);
+        console.log('repliesList', repliesList);
+        console.log('repliesList',commentId);
+        toggleRepliesList(toggleRepliesBtn, repliesList, replyCount);
         return;
       }
 
+      toggleRepliesBtn.disabled = true;
+      toggleRepliesBtn.innerHTML = '<span>⏳</span><span>加载中...</span>';
+
       try {
-        // 获取基础信息
-        const songRes = await axios.get(`http://localhost:3000/api/songs/${songId}`, { withCredentials: true });
-        const song = songRes.data.data;
-        
-        // 获取专辑信息
-        const albumRes = await axios.get(`http://localhost:3000/api/albums/${song.album_id}`, { withCredentials: true });
-        const album = albumRes.data.data;
+        const replyData = await loadCommentReplies(commentId, 1, 10);
+        if (!replyData) return;
 
-        // 填充数据
-        document.getElementById('songName').textContent = song.name_cn;
-        document.getElementById('albumName').textContent = album.name_cn;
-        document.getElementById('releaseDate').textContent = `发行时间：${album.release_date || '未知'}`;
-        document.getElementById('lyricist').textContent = song.lyricist || '—';
-        document.getElementById('composer').textContent = song.composer || '—';
-        document.getElementById('arranger').textContent = song.arranger || '—';
-        document.getElementById('duration').textContent = song.duration || '—';
+        // 移除现有回复列表（如果有）
+        if (repliesList) {
+          repliesList.remove();
+        }
 
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('songDetail').style.display = 'block';
+        const newRepliesList = document.createElement('div');
+        newRepliesList.className = 'replies-list';
 
-        // 初始化评分相关
-        await getSongRating();
-        await getUserCurrentRating();
-        initRatingSystem();
+        if (emptyRepliesTip) {
+          emptyRepliesTip.parentNode.replaceChild(newRepliesList, emptyRepliesTip);
+        } else {
+          const commentActions = item.querySelector('.comment-actions');
+          if (commentActions) {
+            commentActions.parentNode.insertBefore(newRepliesList, commentActions.nextSibling);
+          }
+        }
 
-        // ===================== 新增：初始化评论功能 =====================
-        // 初始化评论发布表单
-        initCommentForm();
-        // 加载评论列表
-        await loadComments(1);
+        const realReplyCount = parseInt(replyData.pagination?.total || '0', 10);
+        toggleRepliesBtn.dataset.replyCount = realReplyCount;
 
+        if (replyData.replies && replyData.replies.length > 0) {
+          replyData.replies.forEach(reply => {
+            if (!reply.parent_id || reply.parent_id !== commentId) {
+              reply.parent_id = commentId;
+            }
+            renderReplyItem(reply, newRepliesList, false);
+          });
+        } else {
+          const emptyTip = document.createElement('div');
+          emptyTip.className = 'empty-replies-tip';
+          emptyTip.style.cssText = 'padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;';
+          emptyTip.textContent = '';
+          newRepliesList.appendChild(emptyTip);
+        }
+
+        toggleRepliesList(toggleRepliesBtn, newRepliesList, realReplyCount);
       } catch (err) {
-        document.getElementById('loading').textContent = "加载失败，请检查网络或歌曲ID是否存在";
-        console.error(err);
+        console.error('加载回复列表失败:', err);
+        showCommentTip('加载回复失败，请重试', 'error');
+      } finally {
+        toggleRepliesBtn.disabled = false;
+      }
+    });
+  }
+// ... existing code ...
+  console.log(`【评论渲染】【父评论渲染】 评论渲染完成，事件绑定完成`);
+  return item;
+}
+
+
+/**
+ * 渲染评论分页
+ */
+function renderCommentsPagination() {
+  const paginationEl = document.getElementById('commentsPagination');
+  paginationEl.innerHTML = '';                    
+  console.log(`【评论列表】【分页渲染】 开始渲染分页，当前页码=${currentCommentPage}, 总页数=${totalCommentPages}`);
+  
+  // 上一页按钮
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'page-btn';
+  prevBtn.textContent = '←';
+  prevBtn.disabled = currentCommentPage === 1;
+  prevBtn.onclick = () => {
+    if (currentCommentPage > 1) {
+      currentCommentPage--;
+      loadComments(currentCommentPage);
+    }
+  };
+  paginationEl.appendChild(prevBtn);
+
+  // 页码按钮（最多显示5个）
+  const startPage = Math.max(1, currentCommentPage - 2);
+  const endPage = Math.min(totalCommentPages, startPage + 4);
+  
+  for (let i = startPage; i <= endPage; i++) {
+    const pageBtn = document.createElement('button');
+    pageBtn.className = `page-btn ${i === currentCommentPage ? 'active' : ''}`;
+    pageBtn.textContent = i;
+    pageBtn.onclick = () => {
+      currentCommentPage = i;
+      loadComments(i);
+    };
+    paginationEl.appendChild(pageBtn);
+  }
+
+  // 下一页按钮
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'page-btn';
+  nextBtn.textContent = '→';
+  nextBtn.disabled = currentCommentPage === totalCommentPages;
+  nextBtn.onclick = () => {
+    if (currentCommentPage < totalCommentPages) {
+      currentCommentPage++;
+      loadComments(currentCommentPage);
+    }
+  };
+  paginationEl.appendChild(nextBtn);
+  paginationEl.style.display = totalCommentPages > 1 ? 'flex' : 'none';
+  console.log(`【评论列表】【分页渲染】 分页渲染完成`);
+}
+
+/**
+ * 初始化评论发布表单
+ */
+function initCommentForm() {
+  console.group(`【评论发布】【表单初始化】 开始初始化评论发布表单`);
+  // ========== 重点TOKEN日志 ==========
+  const token = localStorage.getItem('music_user_token');
+  const desensitizeToken = token ? `${token.slice(0,8)}****${token.slice(-8)}` : '无TOKEN';
+  console.log(`【评论发布】【表单初始化】 TOKEN=${desensitizeToken}, TOKEN是否存在=${!!token}`);
+
+  const loginTip = document.getElementById('commentLoginTip');
+  const form = document.getElementById('commentForm');
+  const textarea = document.getElementById('commentContent');
+  const lengthTip = document.getElementById('commentLengthTip');
+  const btn = document.getElementById('commentSubmitBtn');
+  const empty = document.getElementById('emptyComments');
+
+  if (!token) {
+    console.warn(`【评论发布】【表单初始化】 TOKEN为空，显示登录提示，隐藏发布表单`);
+    loginTip.style.display = 'block';
+    form.style.display = 'none';
+    console.groupEnd();
+    return;
+  }
+
+  loginTip.style.display = 'none';
+  form.style.display = 'block';
+  console.log(`【评论发布】【表单初始化】 TOKEN有效，显示发布表单`);
+
+  // 字数统计
+  textarea.addEventListener('input', () => {
+    const content = textarea.value.trim();
+    const length = content.length;
+    lengthTip.textContent = `${length}/500`;
+    btn.disabled = length < 1 || length > 500;
+  });
+
+  // 发布评论核心逻辑
+  btn.onclick = async () => {
+    const content = textarea.value.trim();
+    console.log(`【评论发布】【提交评论】 用户点击发布评论，内容=${content}, 长度=${content.length}`);
+    if (!content || content.length < 1 || content.length > 500) {
+      console.warn(`【评论发布】【提交评论】 内容长度校验失败，终止发布`);
+      return;
+    }
+  
+    btn.disabled = true;
+    btn.textContent = "发布中...";
+    const tempCommentId = `temp_${Date.now()}`;
+    console.log(`【评论发布】【提交评论】 生成临时评论ID=${tempCommentId}，开始乐观更新UI`);
+ 
+    try {
+      // 优先读取缓存的用户信息
+      let user = getUserFromCache();
+      if (!user) {
+        console.log(`【评论发布】【提交评论】 无用户缓存，请求最新用户信息`);
+        user = await getCurrentUserInfo();
+        if (!user) {
+          console.error(`【评论发布】【提交评论】 用户信息失效，清除TOKEN并跳转登录`);
+          showCommentTip('用户信息失效，请重新登录！', 'error');
+          localStorage.removeItem('music_user_token');
+          clearUserCache();
+          setTimeout(() => location.href = "login.html", 1000);
+          return;
+        }
+      }
+  
+      // 前端立即用缓存信息渲染评论
+      renderCommentItem({
+        _id: tempCommentId,
+        content: content,
+        nick_name: user.nick_name,
+        username: user.username,
+        avatar: user.avatar,
+        likeCount: 0,
+        likedByMe: false,
+        createdAt: new Date().toISOString(),
+        replies: [],
+        replies_total: 0,
+        isTemp: true
+      }, true);
+      empty.style.display = "none";
+      console.log(`【评论发布】【提交评论】 临时评论渲染完成，隐藏空提示`);
+  
+      // 清空输入框
+      textarea.value = "";
+      lengthTip.textContent = "0/500";
+  
+      // 手动更新评论总数
+      const totalEl = document.getElementById("commentsTotalCount");
+      const currentTotal = parseInt(totalEl.textContent || '0', 10);
+      totalEl.textContent = `${Math.max(0, currentTotal + 1)} 条评论`;
+      console.log(`【评论发布】【提交评论】 更新评论总数，原总数=${currentTotal}，新总数=${currentTotal+1}`);
+  
+      // 后台异步提交
+      const reqUrl = `http://localhost:3000/api/${resourceType}s/${resourceId}/comments`;
+      const reqData = { content: content };
+      console.log(`【评论发布】【提交评论】 发起后端请求，地址=${reqUrl}, 请求参数=`, reqData);
+      const response = await axios.post(
+        reqUrl, reqData,
+        {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          withCredentials: true
+        }
+      );
+      console.log(`【评论发布】【提交评论】 请求成功，响应数据=`, response.data);
+  
+      if (response.data.code === 200) {
+        const { commentId: realCommentId } = response.data.data;
+        console.log(`【评论发布】【提交评论】 评论发布成功，真实评论ID=${realCommentId}`);
+        
+        // 替换临时评论ID
+        const tempCommentEl = document.querySelector(`.comment-item[data-comment-id="${tempCommentId}"]`);
+        if (tempCommentEl) {
+          tempCommentEl.dataset.commentId = realCommentId;
+          const likeBtn = tempCommentEl.querySelector(`.like-btn[data-comment-id="${tempCommentId}"]`);
+          if (likeBtn) likeBtn.dataset.commentId = realCommentId;
+          const replyBtn = tempCommentEl.querySelector(`.reply-btn[data-comment-id="${tempCommentId}"]`);
+          if (replyBtn) replyBtn.dataset.commentId = realCommentId;
+          const toggleBtn = tempCommentEl.querySelector(`.toggle-replies-btn[data-comment-id="${tempCommentId}"]`);
+          if (toggleBtn) toggleBtn.dataset.commentId = realCommentId;
+          tempCommentEl.classList.remove('temp-comment');
+          console.log(`【评论发布】【提交评论】 临时ID替换完成，更新为真实ID=${realCommentId}`);
+        }
+
+        if (currentCommentPage !== 1) {
+          await loadComments(1);
+          currentCommentPage = 1;
+          console.log(`【评论发布】【提交评论】 非第一页发布，刷新第一页评论列表`);
+        }
+  
+        showCommentTip('评论发布成功！');
+      }
+  
+      refreshUserInfo(token);
+    } catch (err) {
+      console.error(`【评论发布】【提交评论】 评论提交失败，错误详情=`, err);
+      showCommentTip('评论发布失败，请稍后再试', 'error');
+      
+      // 回滚UI
+      const tempCommentEl = document.querySelector(`.comment-item[data-comment-id="${tempCommentId}"]`);
+      if (tempCommentEl) {
+        tempCommentEl.remove();
+        const totalEl = document.getElementById("commentsTotalCount");
+        const currentTotal = parseInt(totalEl.textContent || '0', 10);
+        totalEl.textContent = `${Math.max(0, currentTotal - 1)} 条评论`;
+        if (list.children.length === 0) empty.style.display = "block";
+        console.log(`【评论发布】【提交评论】 请求失败，回滚UI并恢复评论总数`);
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "发布评论";
+      console.log(`【评论发布】【提交评论】 评论发布流程结束，恢复按钮状态`);
+    }
+  };
+  console.groupEnd();
+}
+
+// ========== 页面加载与事件绑定 ==========
+/**
+ * 页面主加载函数
+ */
+async function loadPage() {
+  console.group(`【页面初始化】【主加载函数】 页面开始加载`);
+  if (!resourceId) {
+    console.error(`【页面初始化】【主加载函数】 resourceId为空，跳转列表页`);
+    window.location.replace('songs-list.html');
+    console.groupEnd();
+    return;
+  }
+  console.log(`【页面初始化】【主加载函数】 resourceId=${resourceId}, resourceType=${resourceType}`);
+
+  try {
+    // 获取资源基础信息
+    const resourceRes = await axios.get(`http://localhost:3000/api/${resourceType}s/${resourceId}`, { withCredentials: true });
+    const resource = resourceRes.data.data;
+    console.log(`【页面初始化】【主加载函数】 获取资源信息成功=`, resource);
+    
+    // 处理专辑信息
+    let albumName = '单曲/未知专辑';
+    let releaseDate = '未知';
+    if (resource.album_id && resource.album_id !== 'undefined' && resource.album_id !== '') {
+      try {
+        const albumRes = await axios.get(`http://localhost:3000/api/albums/${resource.album_id}`, { withCredentials: true });
+        const album = albumRes.data.data;
+        albumName = album.name_cn || '单曲/未知专辑';
+        releaseDate = album.release_date || '未知';
+        console.log(`【页面初始化】【主加载函数】 获取专辑信息成功=`, album);
+      } catch (albumErr) {
+        console.warn(`【页面初始化】【主加载函数】 获取专辑信息失败=`, albumErr);
       }
     }
 
-    document.addEventListener('DOMContentLoaded', loadPage);
-  </script>
+    // 填充页面数据
+    document.getElementById('songName').textContent = resource.name_cn || '未知名称';
+    document.getElementById('albumName').textContent = albumName;
+    document.getElementById('releaseDate').textContent = `发行时间：${releaseDate}`;
+    document.getElementById('lyricist').textContent = resource.lyricist || '—';
+    document.getElementById('composer').textContent = resource.composer || '—';
+    document.getElementById('arranger').textContent = resource.arranger || '—';
+    document.getElementById('duration').textContent = resource.duration || '—';
+    console.log(`【页面初始化】【主加载函数】 页面数据填充完成`);
+
+    // 显示内容区
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('songDetail').style.display = 'block';
+    console.log(`【页面初始化】【主加载函数】 显示页面内容区，隐藏加载中`);
+
+    // 初始化评分和评论功能
+    await getResourceRating();
+    await getUserCurrentRating();
+    initRatingSystem();
+    initCommentForm();
+    await loadComments(1);
+    console.log(`【页面初始化】【主加载函数】 所有功能初始化完成`);
+
+  } catch (err) {
+    document.getElementById('loading').textContent = "加载失败，请检查网络或资源ID是否存在";
+    console.error(`【页面初始化】【主加载函数】 页面加载失败，错误详情=`, err);
+  }
+  console.groupEnd();
+}
+
+// 绑定页面事件
+document.getElementById('backToListBtn').addEventListener('click', () => {
+  console.log(`【页面操作】【返回列表】 用户点击返回列表按钮`);
+  window.location.replace('./songs-list.html');
+});
+
+window.addEventListener('popstate', () => {
+  console.log(`【页面操作】【返回事件】 监听浏览器返回事件，跳转列表页`);
+  window.location.replace('./songs-list.html');
+});
+
+// 页面初始化
+document.addEventListener('DOMContentLoaded', () => {
+  console.log(`【页面初始化】【DOM加载完成】 DOM树加载完成，开始初始化用户缓存和页面`);
+  getUserFromCache();
+  loadPage();
+});
+
+</script>
 </body>
 </html>

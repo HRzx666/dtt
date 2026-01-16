@@ -1,9 +1,10 @@
-// 1. 核心依赖导入
+// 1. 核心依赖导入（所有依赖前置）
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+
 // 新增：调试用的时间格式化工具
 const getNow = () => new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 
@@ -11,17 +12,25 @@ const getNow = () => new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shangh
 const taoZheAlbums = require('./data/albums');
 const taoZheSongs = require('./data/songs');
 const taoZheSingles = require('./data/singles');
+
 // 调试：打印导入的数据数量
 console.log(`[${getNow()}] 📥 导入静态数据 - 专辑数：${taoZheAlbums.length} | 歌曲数：${taoZheSongs.length} | 单曲数：${taoZheSingles.length}`);
 
 // 3. 后端服务初始化
 const app = express();
+
+// 4. 全局中间件注册（必须在所有路由之前）
 // 修复CORS：兼容127.0.0.1:5500和localhost:5500
 app.use(cors({ 
   origin: ['http://127.0.0.1:5500', 'http://localhost:5500'], 
   credentials: true 
 }));
-app.use(express.json());
+
+// 配置JSON解析（支持大请求体）
+app.use(express.json({ 
+  limit: '10mb', // 允许最大10MB的JSON请求体
+  extended: true 
+}));
 
 // 新增：全局请求日志中间件（修复req.body为空时的substring报错）
 app.use((req, res, next) => {
@@ -34,12 +43,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// 4. 核心配置
-const JWT_SECRET = 'tao_zhe_official_2025_secret_key';
+// 5. 核心配置
+const JWT_SECRET = 'tao_zhe_official_2025_secret_key'; // 生产环境建议改为环境变量
 const MONGODB_URL = 'mongodb://localhost:27017/tao_zhe_official';
-const PORT = 3000; // 保持你原有端口3000不变
+const PORT = 3000; // 服务端口
 
-// 5. 数据模型定义（无修改，保持原有逻辑）
+// 6. 数据模型定义（所有模型在使用前定义）
+// 6.1 歌曲模型
 const songSchema = new mongoose.Schema({
   id: { type: String, unique: true, required: true },
   album_id: { type: String, required: true },
@@ -52,6 +62,7 @@ const songSchema = new mongoose.Schema({
   duration: { type: String }
 });
 
+// 6.2 专辑模型
 const albumSchema = new mongoose.Schema({
   id: { type: String, unique: true, required: true },
   name_cn: { type: String, required: true },
@@ -65,6 +76,7 @@ const albumSchema = new mongoose.Schema({
   record_label: { type: String, required: true }
 });
 
+// 6.3 单曲模型
 const singleSchema = new mongoose.Schema({
   id: { type: String, unique: true, required: true },
   name_cn: { type: String, required: true },
@@ -72,12 +84,16 @@ const singleSchema = new mongoose.Schema({
   description: { type: String }
 });
 
+// 6.4 用户模型（包含昵称、头像）
 const userSchema = new mongoose.Schema({
   username: { type: String, unique: true, required: true, minlength: 3 },
   password: { type: String, required: true, minlength: 6 },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  avatar: { type: String, default: '' }, // 头像（Base64/URL）
+  nickname: { type: String, default: '', minlength: 2, maxlength: 10 } // 昵称
 });
 
+// 6.5 评分模型
 const ratingSchema = new mongoose.Schema({
   song_id: { type: String, required: function() { return this.resource_type === 'song'; } },
   resource_type: { type: String, required: true, enum: ['song', 'single'], default: 'song' },
@@ -86,38 +102,56 @@ const ratingSchema = new mongoose.Schema({
   score: { type: Number, required: true, min: 0.5, max: 5, enum: [0.5,1,1.5,2,2.5,3,3.5,4,4.5,5] },
   createdAt: { type: Date, default: Date.now }
 });
+// 评分模型索引（防止重复评分）
 ratingSchema.index({ song_id: 1, username: 1 }, { unique: true, partialFilterExpression: { resource_type: 'song' } });
 ratingSchema.index({ resource_type: 1, resource_id: 1, username: 1 }, { unique: true });
 
-// ===================== 新增：评论数据模型 =====================
+// 6.6 评论模型
 const commentSchema = new mongoose.Schema({
-  // 关联字段：兼容歌曲/单曲
+  // 关联字段：兼容歌曲/单曲/专辑
   song_id: { type: String, required: function() { return this.resource_type === 'song'; } },
-  resource_type: { type: String, required: true, enum: ['song', 'single'], default: 'song' },
-  resource_id: { type: String, required: true }, // 歌曲/单曲ID
+  resource_type: { type: String, required: true, enum: ['song', 'single', 'album'], default: 'song' },
+  resource_id: { type: String, required: true },
+  // 评论用户信息
+  username: { type: String, required: true },
+  nick_name: { type: String, required: true, trim: true },
+  avatar: { type: String, default: '' },
   // 评论内容
-  username: { type: String, required: true }, // 评论用户
-  content: { type: String, required: true, minlength: 1, maxlength: 500 }, // 评论内容（1-500字）
-  // 时间字段
+  content: { type: String, required: true, minlength: 1, maxlength: 500 },
   createdAt: { type: Date, default: Date.now },
-  // 可选：点赞数（如果需要）
-  likeCount: { type: Number, default: 0 }
+  likeCount: { type: Number, default: 0 },
+  // 回复相关字段
+  parent_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment',
+    default: null
+  },
+  reply_to_user_id: {
+    type: String,
+    default: ''
+  },
+  reply_to_name: {
+    type: String,
+    default: ''
+  }
 });
-// 索引优化：按资源类型+ID查询评论，按创建时间排序
+// 评论模型索引优化
 commentSchema.index({ resource_type: 1, resource_id: 1, createdAt: -1 });
-// ===================== 评论模型定义结束 =====================
+commentSchema.index({ parent_id: 1, createdAt: -1 });
 
-// 7. 模型实例化
+// 7. 模型实例化（所有模型在使用前实例化）
 const Song = mongoose.model('Song', songSchema);
 const Album = mongoose.model('Album', albumSchema);
 const Single = mongoose.model('Single', singleSchema);
 const User = mongoose.model('User', userSchema);
 const Rating = mongoose.model('Rating', ratingSchema);
-// ===================== 新增：评论模型实例化 =====================
 const Comment = mongoose.model('Comment', commentSchema);
-// ===================== 模型实例化结束 =====================
 
-// 8. 核心工具函数/中间件（增强错误日志）
+// 8. 导入外部模型（评论点赞，确保在使用前导入）
+const CommentLike = require('./models/CommentLike');
+
+// 9. 核心工具函数/中间件（所有工具函数在路由前定义）
+// 9.1 自定义错误类
 class AppError extends Error {
   constructor(message, statusCode = 400) {
     super(message);
@@ -127,22 +161,30 @@ class AppError extends Error {
   }
 }
 
+// 9.2 全局错误处理中间件（放在所有路由之后，最后注册）
 const errorHandler = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   // 增强：打印完整错误栈
   console.error(`[${getNow()}] ❌ 接口错误 - 路径：${req.originalUrl} | 错误码：${err.statusCode} | 错误信息：${err.message} | 错误栈：`, err.stack);
   
+  // 处理重复键错误（11000）
   if (err.code === 11000) {
     const field = Object.keys(err.keyValue)[0];
-    const msg = field === 'username' ? '用户名已存在' : '不可重复评分';
+    const msg = field === 'username' ? '用户名已存在' : field === 'commentId' ? '已点赞该评论' : '不可重复评分';
     return res.status(400).json({ code: 400, msg, data: null });
   }
+  
+  // 处理验证错误
   if (err.name === 'ValidationError') {
     const msg = Object.values(err.errors).map(v => v.message).join(', ');
     return res.status(400).json({ code: 400, msg, data: null });
   }
+  
+  // JWT相关错误
   if (err.name === 'JsonWebTokenError') return res.status(401).json({ code: 401, msg: '无效token', data: null });
   if (err.name === 'TokenExpiredError') return res.status(401).json({ code: 401, msg: 'token过期', data: null });
+  
+  // 生产环境隐藏详细错误
   res.status(err.statusCode).json({
     code: err.statusCode,
     msg: process.env.NODE_ENV === 'development' ? err.message : '服务器错误',
@@ -150,12 +192,14 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
+// 9.3 生成JWT Token
 const generateToken = (username) => jwt.sign({ username }, JWT_SECRET, { expiresIn: '7d' });
 
+// 9.4 登录鉴权中间件
 const authMiddleware = (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
-    if (!token) throw new AppError('未登录', 401);
+    if (!token) throw new AppError('未登录，请先登录', 401);
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = { username: decoded.username };
     console.log(`[${getNow()}] 🔐 鉴权成功 - 用户名：${decoded.username}`);
@@ -165,23 +209,20 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+// 10. 初始化静态数据函数（仅清空/插入专辑/歌曲/单曲）
 async function initData() {
   try {
     console.log(`[${getNow()}] 🧹 开始清空静态数据（专辑/歌曲/单曲）...`);
-    // 只删除专辑、歌曲、单曲（静态数据），移除用户/评分/评论的删除！
+    // 只删除静态数据，保留用户/评分/评论
     const [albumDel, songDel, singleDel] = await Promise.all([
       Album.deleteMany({}),
       Song.deleteMany({}),
       Single.deleteMany({})
-      // 👇 删掉这三行：不再清空用户、评分、评论
-      // User.deleteMany({}),
-      // Rating.deleteMany({}),
-      // Comment.deleteMany({})
     ]);
     console.log(`[${getNow()}] 🧹 清空静态数据完成 - 专辑：${albumDel.deletedCount} | 歌曲：${songDel.deletedCount} | 单曲：${singleDel.deletedCount}`);
 
     console.log(`[${getNow()}] 📤 开始插入静态数据...`);
-    // 只插入静态数据（专辑/歌曲/单曲）
+    // 插入静态数据
     const [albumIns, songIns, singleIns] = await Promise.all([
       Album.insertMany(taoZheAlbums),
       Song.insertMany(taoZheSongs),
@@ -189,7 +230,7 @@ async function initData() {
     ]);
     console.log(`[${getNow()}] ✅ 静态数据入库成功 - 专辑：${albumIns.length} | 歌曲：${songIns.length} | 单曲：${singleIns.length}`);
 
-    // 验证静态数据插入结果
+    // 验证插入结果
     const [albumCount, songCount, singleCount] = await Promise.all([
       Album.countDocuments({}),
       Song.countDocuments({}),
@@ -201,8 +242,9 @@ async function initData() {
   }
 }
 
-// 10. 完整接口（所有核心接口添加调试日志）
-// 10.1 专辑相关
+// 11. 核心业务接口（按功能模块组织，顺序合理）
+// 11.1 专辑相关接口
+// 获取专辑列表
 app.get('/api/albums', async (req, res, next) => {
   try {
     const albums = await Album.find({});
@@ -211,6 +253,7 @@ app.get('/api/albums', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// 获取专辑详情
 app.get('/api/albums/:albumId', async (req, res, next) => {
   try {
     const album = await Album.findOne({ id: req.params.albumId });
@@ -220,6 +263,7 @@ app.get('/api/albums/:albumId', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// 获取专辑下的歌曲
 app.get('/api/albums/:albumId/songs', async (req, res, next) => {
   try {
     const songs = await Song.find({ album_id: req.params.albumId }).sort({ track_number: 1 });
@@ -228,6 +272,7 @@ app.get('/api/albums/:albumId/songs', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// 专辑歌曲按评分排序
 app.get('/api/albums/:albumId/songs/sort-by-rating', async (req, res, next) => {
   try {
     const { albumId } = req.params;
@@ -276,8 +321,8 @@ app.get('/api/albums/:albumId/songs/sort-by-rating', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// 10.2 歌曲相关
-// ========== 先定义具体路由（优先匹配） ==========
+// 11.2 歌曲相关接口
+// 全量歌曲按评分排序
 app.get('/api/songs/sort-by-rating', async (req, res, next) => {
   try {
     const { page = 1, pageSize = 10 } = req.query;
@@ -366,7 +411,7 @@ app.get('/api/songs/sort-by-rating', async (req, res, next) => {
   }
 });
 
-// ========== 后定义动态路由（兜底） ==========
+// 获取单首歌曲详情（兜底路由，放在通用接口后）
 app.get('/api/songs/:songId', async (req, res, next) => {
   try {
     const song = await Song.findOne({ id: req.params.songId });
@@ -376,7 +421,8 @@ app.get('/api/songs/:songId', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// 10.3 单曲相关
+// 11.3 单曲相关接口
+// 获取单曲列表
 app.get('/api/singles', async (req, res, next) => {
   try {
     const singles = await Single.find({}).sort({ release_date: 1 });
@@ -385,6 +431,7 @@ app.get('/api/singles', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// 获取单曲详情
 app.get('/api/singles/:singleId', async (req, res, next) => {
   try {
     const single = await Single.findOne({ id: req.params.singleId });
@@ -394,6 +441,7 @@ app.get('/api/singles/:singleId', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// 提交单曲评分
 app.post('/api/singles/:singleId/rating', authMiddleware, async (req, res, next) => {
   try {
     const { singleId } = req.params;
@@ -401,25 +449,55 @@ app.post('/api/singles/:singleId/rating', authMiddleware, async (req, res, next)
     const { username } = req.user;
     console.log(`[${getNow()}] ⭐ 提交单曲评分 - 单曲ID：${singleId} | 用户名：${username} | 评分：${score}`);
 
+    // 1. 检查单曲是否存在
     const singleExist = await Single.findOne({ id: singleId });
     if (!singleExist) throw new AppError('单曲不存在', 404);
 
-    if (![0.5,1,1.5,2,2.5,3,3.5,4,4.5,5].includes(Number(score))) {
+    // 2. 校验评分格式
+    const scoreNum = Number(score);
+    if (![0.5,1,1.5,2,2.5,3,3.5,4,4.5,5].includes(scoreNum)) {
       throw new AppError('评分必须是0.5-5的半星递增');
     }
 
-    await new Rating({
-      resource_type: 'single',
-      resource_id: singleId,
-      username,
-      score: Number(score)
-    }).save();
+    // 3. 原子操作：存在则更新，不存在则新增（完全不包含song_id字段）
+    const result = await Rating.findOneAndUpdate(
+      {
+        resource_type: 'single',
+        resource_id: singleId,
+        username
+      },
+      { 
+        $set: { score: scoreNum },
+        $unset: { song_id: "" } // 确保剔除song_id字段（关键）
+      },
+      { 
+        upsert: true, // 无记录则新增
+        new: true,    // 返回更新/新增后的文档
+        runValidators: true,
+        // 新增：确保新增时不生成song_id字段
+        setDefaultsOnInsert: false 
+      }
+    );
 
-    console.log(`[${getNow()}] ✅ 单曲评分提交成功 - 单曲ID：${singleId} | 用户名：${username}`);
-    res.json({ code: 200, msg: '单曲评分成功', data: { singleId, username, score } });
-  } catch (err) { next(err); }
+    const isNew = result._id.getTimestamp() - result.updatedAt < 1000;
+    console.log(`[${getNow()}] ✅ 单曲评分${isNew ? '提交' : '更新'}成功 - 单曲ID：${singleId} | 用户名：${username}`);
+
+    // 4. 返回结果
+    res.json({ 
+      code: 200, 
+      msg: isNew ? '评分提交成功' : '评分修改成功', 
+      data: { singleId, username, score: scoreNum } 
+    });
+  } catch (err) { 
+    // 兜底处理
+    if (err.code === 11000) {
+      return res.status(400).json({ code: 400, msg: '请勿重复评分，如需修改请直接选新分数', data: null });
+    }
+    next(err); 
+  }
 });
 
+// 获取单曲平均分
 app.get('/api/singles/:singleId/rating/average', async (req, res, next) => {
   try {
     const { singleId } = req.params;
@@ -435,6 +513,7 @@ app.get('/api/singles/:singleId/rating/average', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// 获取用户单曲评分
 app.get('/api/user/singles/:singleId/rating', authMiddleware, async (req, res, next) => {
   try {
     const { singleId } = req.params;
@@ -446,6 +525,7 @@ app.get('/api/user/singles/:singleId/rating', authMiddleware, async (req, res, n
   } catch (err) { next(err); }
 });
 
+// 全量单曲按评分排序
 app.get('/api/singles/sort-by-rating', async (req, res, next) => {
   try {
     const { page = 1, pageSize = 10 } = req.query;
@@ -489,8 +569,7 @@ app.get('/api/singles/sort-by-rating', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ===================== 新增：整合歌曲+单曲的评分排序接口 =====================
-// 完全新增，不修改原有任何接口，仅补充该接口供前端调用
+// 整合歌曲+单曲按评分排序
 app.get('/api/all-resources/sort-by-rating', async (req, res, next) => {
   try {
     const { page = 1, pageSize = 10 } = req.query;
@@ -583,12 +662,12 @@ app.get('/api/all-resources/sort-by-rating', async (req, res, next) => {
     next(err);
   }
 });
-// ===================== 新增接口结束 =====================
 
-// 10.4 用户相关
+// 11.4 用户相关接口
+// 用户注册
 app.post('/api/user/register', async (req, res, next) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, nickname = username } = req.body; // 不传nickname则用username兜底
     console.log(`[${getNow()}] 📝 用户注册 - 用户名：${username}`);
     
     if (!username || !password) throw new AppError('用户名/密码不能为空');
@@ -596,14 +675,21 @@ app.post('/api/user/register', async (req, res, next) => {
     if (password.length < 6) throw new AppError('密码至少6位');
     if (await User.findOne({ username })) throw new AppError('用户名已存在');
     
+    // 校验昵称长度（如果传了自定义昵称）
+    if (nickname.length < 2 || nickname.length > 10) {
+      throw new AppError('昵称长度需在2-10个字符之间');
+    }
+    
     const hashedPwd = await bcrypt.hash(password, 10);
-    await new User({ username, password: hashedPwd }).save();
+    // 创建用户时传入nickname（兜底为username，确保符合长度要求）
+    await new User({ username, password: hashedPwd, nickname }).save();
     
     console.log(`[${getNow()}] ✅ 用户注册成功 - 用户名：${username}`);
     res.json({ code: 200, msg: '注册成功', data: { username } });
   } catch (err) { next(err); }
 });
 
+// 用户登录
 app.post('/api/user/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
@@ -620,12 +706,75 @@ app.post('/api/user/login', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-app.get('/api/user/info', authMiddleware, (req, res) => {
-  console.log(`[${getNow()}] 📖 获取用户信息 - 用户名：${req.user.username}`);
-  res.json({ code: 200, msg: '获取用户信息成功', data: { username: req.user.username } });
+// 获取用户信息
+app.get('/api/user/info', authMiddleware, async (req, res, next) => {
+  try {
+    const user = await User.findOne({ username: req.user.username });
+    if (!user) throw new AppError('用户不存在', 404);
+    
+    res.json({ 
+      code: 200, 
+      msg: '获取用户信息成功', 
+      data: { 
+        username: user.username,
+        createdAt: user.createdAt,
+        avatar: user.avatar,
+        nickname: user.nickname || '未设置' // 新增：返回昵称，无则显示“未设置”
+      } 
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
-// 10.5 评分相关
+// 更新用户信息（昵称/头像）
+app.post('/api/user/update', authMiddleware, async (req, res, next) => {
+  try {
+    const { nickname, avatar } = req.body;
+    const { username } = req.user;
+
+    // 校验参数（只更新传了的字段）
+    const updateData = {};
+    if (nickname !== undefined) {
+      if (nickname.length < 2 || nickname.length > 10) {
+        throw new AppError('昵称长度需在2-10个字符之间', 400);
+      }
+      updateData.nickname = nickname;
+    }
+    if (avatar !== undefined) {
+      if (!avatar) throw new AppError('头像内容不能为空', 400);
+      updateData.avatar = avatar;
+    }
+
+    // 空更新校验
+    if (Object.keys(updateData).length === 0) {
+      throw new AppError('请传入需要更新的字段（昵称/头像）', 400);
+    }
+
+    // 更新用户信息
+    const user = await User.findOneAndUpdate(
+      { username },
+      { $set: updateData },
+      { new: true, runValidators: true } // 返回更新后数据 + 执行字段校验
+    );
+
+    if (!user) throw new AppError('用户不存在', 404);
+
+    res.json({
+      code: 200,
+      msg: '信息更新成功',
+      data: {
+        nickname: user.nickname,
+        avatar: user.avatar
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 11.5 评分相关接口（歌曲）
+// 提交歌曲评分
 app.post('/api/songs/:songId/rating', authMiddleware, async (req, res, next) => {
   try {
     const { score } = req.body;
@@ -677,6 +826,8 @@ app.post('/api/songs/:songId/rating', authMiddleware, async (req, res, next) => 
     next(err); 
   }
 });
+
+// 获取歌曲平均分
 app.get('/api/songs/:songId/rating/average', async (req, res, next) => {
   try {
     const { songId } = req.params;
@@ -692,6 +843,7 @@ app.get('/api/songs/:songId/rating/average', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// 获取用户歌曲评分
 app.get('/api/user/songs/:songId/rating', authMiddleware, async (req, res, next) => {
   try {
     const { songId } = req.params;
@@ -703,10 +855,96 @@ app.get('/api/user/songs/:songId/rating', authMiddleware, async (req, res, next)
   } catch (err) { next(err); }
 });
 
-// ===================== 新增：评论功能接口（核心） =====================
-// 10.6 评论相关接口（完全新增，不影响原有逻辑）
-// 10.6.1 发布歌曲评论（需要登录）
-app.post('/api/songs/:songId/comment', authMiddleware, async (req, res, next) => {
+// 11.6 个人主页接口
+// 获取用户所有歌曲评分（关联专辑）
+app.get('/api/user/ratings/songs', authMiddleware, async (req, res, next) => {
+  try {
+    const { username } = req.user;
+    
+    // 查询用户歌曲评分
+    const userSongRatings = await Rating.find({
+      resource_type: 'song',
+      username: username
+    }).sort({ createdAt: -1 });
+
+    // 关联歌曲+专辑信息
+    const songRatingList = await Promise.all(
+      userSongRatings.map(async (rating) => {
+        const song = await Song.findOne({ id: rating.resource_id });
+        const album = song ? await Album.findOne({ id: song.album_id }) : null;
+        
+        return {
+          rating: {
+            score: rating.score,
+            createdAt: rating.createdAt
+          },
+          song: song ? {
+            name_cn: song.name_cn,
+            id: song.id
+          } : { name_cn: '未知歌曲' },
+          album: album ? {
+            name_cn: album.name_cn,
+            id: album.id
+          } : { name_cn: '未知专辑' }
+        };
+      })
+    );
+
+    res.json({
+      code: 200,
+      data: songRatingList,
+      msg: '获取用户歌曲评分列表成功'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 获取用户所有单曲评分
+app.get('/api/user/ratings/singles', authMiddleware, async (req, res, next) => {
+  try {
+    const { username } = req.user;
+    
+    // 查询用户单曲评分
+    const userSingleRatings = await Rating.find({
+      resource_type: 'single',
+      username: username
+    }).sort({ createdAt: -1 });
+
+    // 关联单曲信息
+    const singleRatingList = await Promise.all(
+      userSingleRatings.map(async (rating) => {
+        const single = await Single.findOne({ id: rating.resource_id });
+        
+        return {
+          rating: {
+            score: rating.score,
+            createdAt: rating.createdAt
+          },
+          single: single ? {
+            name_cn: single.name_cn,
+            release_date: single.release_date
+          } : { 
+            name_cn: '未知单曲', 
+            release_date: '未知时间' 
+          }
+        };
+      })
+    );
+
+    res.json({
+      code: 200,
+      data: singleRatingList,
+      msg: '获取用户单曲评分列表成功'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 11.7 评论相关接口
+// 发布歌曲评论
+app.post('/api/songs/:songId/comments', authMiddleware, async (req, res, next) => {
   try {
     const { songId } = req.params;
     const { content } = req.body;
@@ -721,13 +959,22 @@ app.post('/api/songs/:songId/comment', authMiddleware, async (req, res, next) =>
     if (!content || content.trim().length === 0) throw new AppError('评论内容不能为空');
     if (content.length > 500) throw new AppError('评论内容不能超过500字');
 
-    // 3. 保存评论
+    // 【核心新增】查询当前登录用户的昵称和头像（和单曲评论逻辑一致）
+    const user = await User.findOne({ username });
+    if (!user) throw new AppError('用户不存在', 404);
+    const nick_name = user.nickname || username; // 优先用昵称，无则用用户名
+    const avatar = user.avatar || ''; // 头像为空则存空字符串
+
+    // 3. 保存评论（新增nick_name和avatar字段 + 显式设置parent_id: null）
     const comment = await new Comment({
       song_id: songId,
       resource_type: 'song',
       resource_id: songId,
       username,
-      content: content.trim()
+      nick_name, // 新增
+      avatar,    // 新增
+      content: content.trim(),
+      parent_id: null // ✅ 核心修复：显式设置parent_id为null
     }).save();
 
     console.log(`[${getNow()}] ✅ 歌曲评论发布成功 - 评论ID：${comment._id} | 歌曲ID：${songId} | 用户名：${username}`);
@@ -738,15 +985,18 @@ app.post('/api/songs/:songId/comment', authMiddleware, async (req, res, next) =>
         commentId: comment._id,
         songId,
         username,
+        nick_name, 
+        avatar,    
         content: comment.content,
-        createdAt: comment.createdAt
+        createdAt: comment.createdAt,
+        parent_id: comment.parent_id // 显式返回parent_id（主评论为null）
       } 
     });
   } catch (err) { next(err); }
 });
 
-// 10.6.2 发布单曲评论（需要登录）
-app.post('/api/singles/:singleId/comment', authMiddleware, async (req, res, next) => {
+// 发布单曲评论
+app.post('/api/singles/:singleId/comments', authMiddleware, async (req, res, next) => {
   try {
     const { singleId } = req.params;
     const { content } = req.body;
@@ -761,12 +1011,21 @@ app.post('/api/singles/:singleId/comment', authMiddleware, async (req, res, next
     if (!content || content.trim().length === 0) throw new AppError('评论内容不能为空');
     if (content.length > 500) throw new AppError('评论内容不能超过500字');
 
-    // 3. 保存评论
+    // 3. 查询当前登录用户的昵称和头像
+    const user = await User.findOne({ username });
+    if (!user) throw new AppError('用户不存在', 404);
+    const nick_name = user.nickname || username;
+    const avatar = user.avatar || '';
+
+    // 4. 保存评论（显式设置parent_id: null）
     const comment = await new Comment({
       resource_type: 'single',
       resource_id: singleId,
       username,
-      content: content.trim()
+      nick_name,
+      avatar,
+      content: content.trim(),
+      parent_id: null // ✅ 核心修复：显式设置parent_id为null
     }).save();
 
     console.log(`[${getNow()}] ✅ 单曲评论发布成功 - 评论ID：${comment._id} | 单曲ID：${singleId} | 用户名：${username}`);
@@ -777,6 +1036,8 @@ app.post('/api/singles/:singleId/comment', authMiddleware, async (req, res, next
         commentId: comment._id,
         singleId,
         username,
+        nick_name,
+        avatar,
         content: comment.content,
         createdAt: comment.createdAt
       } 
@@ -784,136 +1045,602 @@ app.post('/api/singles/:singleId/comment', authMiddleware, async (req, res, next
   } catch (err) { next(err); }
 });
 
-// 10.6.3 获取歌曲评论列表（分页，按时间倒序）
+// 发布专辑评论
+app.post('/api/albums/:albumId/comment', authMiddleware, async (req, res, next) => {
+  try {
+    const { albumId } = req.params;
+    const { content } = req.body;
+    const { username } = req.user;
+    console.log(`[${getNow()}] 💬 提交专辑评论 - 专辑ID：${albumId} | 用户名：${username} | 内容：${content.substring(0, 50)}...`);
+
+    // 1. 校验专辑是否存在
+    const albumExist = await Album.findOne({ id: albumId });
+    if (!albumExist) throw new AppError('专辑不存在', 404);
+
+    // 2. 校验评论内容
+    if (!content || content.trim().length === 0) throw new AppError('评论内容不能为空');
+    if (content.length > 500) throw new AppError('评论内容不能超过500字');
+
+    // 3. 查询当前登录用户的昵称和头像
+    const user = await User.findOne({ username });
+    if (!user) throw new AppError('用户不存在', 404);
+    const nick_name = user.nickname || username; // 优先用昵称，无则用用户名
+    const avatar = user.avatar || ''; // 头像为空则存空字符串
+
+    // 4. 保存专辑评论（resource_type=album + 显式设置parent_id: null）
+    const comment = await new Comment({
+      resource_type: 'album', // 标记为专辑评论
+      resource_id: albumId,   // 专辑ID
+      username,
+      nick_name,              // 昵称
+      avatar,                 // 头像
+      content: content.trim(),
+      parent_id: null // ✅ 核心修复：显式设置parent_id为null
+    }).save();
+
+    console.log(`[${getNow()}] ✅ 专辑评论发布成功 - 评论ID：${comment._id} | 专辑ID：${albumId} | 用户名：${username}`);
+    res.json({ 
+      code: 200, 
+      msg: '评论发布成功', 
+      data: { 
+        commentId: comment._id,
+        albumId,
+        username,
+        nick_name, // 返回昵称
+        avatar,    // 返回头像
+        content: comment.content,
+        createdAt: comment.createdAt
+      } 
+    });
+  } catch (err) { next(err); }
+});
+
+// 获取歌曲评论列表（支持排序）
 app.get('/api/songs/:songId/comments', async (req, res, next) => {
   try {
     const { songId } = req.params;
-    const { page = 1, pageSize = 20 } = req.query;
+    const { page = 1, pageSize = 20, sortBy = 'time', order = 'desc' } = req.query;
     const skip = (page - 1) * pageSize;
 
-    console.log(`[${getNow()}] 📖 获取歌曲评论 - 歌曲ID：${songId} | 页码：${page} | 页大小：${pageSize}`);
+    console.log(`[${getNow()}] 📖 获取歌曲评论 - 歌曲ID：${songId} | 页码：${page} | 页大小：${pageSize} | 排序：${sortBy} | 顺序：${order}`);
 
     // 1. 校验歌曲是否存在
     const songExist = await Song.findOne({ id: songId });
     if (!songExist) throw new AppError('歌曲不存在', 404);
 
-    // 2. 查询评论总数
+    // 2. 校验排序参数
+    if (!['time', 'like'].includes(sortBy)) {
+      throw new AppError('排序参数只能是time或like', 400);
+    }
+    if (!['desc', 'asc'].includes(order)) {
+      throw new AppError('排序顺序只能是desc或asc', 400);
+    }
+
+    // 3. 查询评论总数（只查询主评论）
     const total = await Comment.countDocuments({
       resource_type: 'song',
-      resource_id: songId
+      resource_id: songId,
+      parent_id: null
     });
 
-    // 3. 分页查询评论（按时间倒序）
-    const comments = await Comment.find({
-      resource_type: 'song',
-      resource_id: songId
-    })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(Number(pageSize))
-    .select('username content createdAt likeCount'); // 只返回需要的字段
+    // 4. 构建排序条件
+    let sortCondition = {};
+    if (sortBy === 'like') {
+      // 按点赞数排序
+      sortCondition = { likeCount: order === 'desc' ? -1 : 1 };
+    } else {
+      // 默认按时间排序
+      sortCondition = { createdAt: order === 'desc' ? -1 : 1 };
+    }
 
-    console.log(`[${getNow()}] 📖 获取歌曲评论成功 - 歌曲ID：${songId} | 总数量：${total} | 分页数量：${comments.length}`);
+    console.log(`[${getNow()}] 🔧 排序条件：`, JSON.stringify(sortCondition));
+
+    // 5. 分页查询主评论（按指定排序）
+    const mainComments = await Comment.find({
+      resource_type: 'song',
+      resource_id: songId,
+      parent_id: null
+    })
+    // 核心修改：显式包含parent_id字段，确保返回null而非undefined
+    .select('_id username nick_name avatar content createdAt likeCount parent_id')
+    .sort(sortCondition)
+    .skip(skip)
+    .limit(Number(pageSize));
+
+    // 6. 为每个主评论查询回复总数
+    const commentsWithRepliesTotal = await Promise.all(
+      mainComments.map(async (comment) => {
+        const repliesTotal = await Comment.countDocuments({
+          parent_id: comment._id
+        });
+        
+        return {
+          ...comment._doc,
+          replies_total: repliesTotal
+        };
+      })
+    );
+
+    // 调试日志：验证排序效果
+    if (commentsWithRepliesTotal.length > 0) {
+      const firstComment = commentsWithRepliesTotal[0];
+      const lastComment = commentsWithRepliesTotal[commentsWithRepliesTotal.length - 1];
+      console.log(`[${getNow()}] 🔍 排序验证 - 第一条评论点赞数：${firstComment.likeCount} | 时间：${firstComment.createdAt}`);
+      console.log(`[${getNow()}] 🔍 排序验证 - 最后一条评论点赞数：${lastComment.likeCount} | 时间：${lastComment.createdAt}`);
+    }
+
+    console.log(`[${getNow()}] 📖 获取歌曲评论成功 - 歌曲ID：${songId} | 总数量：${total} | 分页数量：${commentsWithRepliesTotal.length} | 排序：${sortBy} | 顺序：${order}`);
     res.json({
       code: 200,
       data: {
-        comments,
+        comments: commentsWithRepliesTotal,
         pagination: { 
           page: Number(page), 
           pageSize: Number(pageSize), 
           total, 
           totalPages: Math.ceil(total / pageSize) 
-        }
+        },
+        sort: { sortBy, order } // 返回当前排序信息
       },
       msg: '获取歌曲评论成功'
     });
-  } catch (err) { next(err); }
+  } catch (err) { 
+    console.error(`[${getNow()}] ❌ 获取歌曲评论失败：`, err.message);
+    next(err); 
+  }
 });
 
-// 10.6.4 获取单曲评论列表（分页，按时间倒序）
+// 获取指定评论的所有回复（子评论）
+
+
+// 【核心修复】评论回复接口（移到正确位置，确保生效）
+app.post('/api/comments/:commentId/reply', authMiddleware, async (req, res, next) => {
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+    const { username } = req.user;
+    console.log(`[${getNow()}] 💬 提交评论回复 - 传入的父评论ID：${commentId} | 回复用户：${username} | 内容：${content.substring(0, 50)}...`);
+
+    // 1. 基础参数校验
+    if (!content || content.trim().length === 0) {
+      throw new AppError('回复内容不能为空', 400);
+    }
+    if (content.length > 500) {
+      throw new AppError('回复内容不能超过500字', 400);
+    }
+
+    // 2. 校验并查询父评论（使用正确的ObjectId转换方法）
+    let parentComment;
+    try {
+      // 使用mongoose.Types.ObjectId.createFromHexString()或直接传递字符串
+      parentComment = await Comment.findById(commentId);
+    } catch (err) {
+      throw new AppError('父评论ID格式错误', 400);
+    }
+    if (!parentComment) {
+      throw new AppError('父评论不存在', 404);
+    }
+    // 关键日志：详细打印父评论ID信息
+    console.log(`[${getNow()}] 📌 查询到父评论 - 父评论ID：${parentComment._id} | 父评论ID字符串：${parentComment._id.toString()} | 父评论parent_id：${parentComment.parent_id} | 父评论类型：${parentComment.resource_type} | 父评论资源ID：${parentComment.resource_id}`);
+
+    // 3. 获取当前登录用户的昵称和头像
+    const currentUser = await User.findOne({ username });
+    if (!currentUser) {
+      throw new AppError('当前用户不存在', 404);
+    }
+    const nick_name = currentUser.nickname || username;
+    const avatar = currentUser.avatar || '';
+
+    // 4. 构建回复评论数据（强制赋值parent_id，优先级最高）
+   const replyCommentData = {
+  resource_type: parentComment.resource_type,
+  resource_id: parentComment.resource_id,
+  username: username,
+  nick_name: nick_name,
+  avatar: avatar,
+  content: content.trim(),
+  // 🔴 核心修复：直接使用父评论的ID属性
+  parent_id: parentComment._id,
+  // ✅ 修改这里：优先使用前端发送的被回复人信息
+  reply_to_user_id: req.body.reply_to_user_id || parentComment.username,
+  reply_to_name: req.body.reply_to_name || parentComment.nick_name
+};
+    // 歌曲评论的回复补充song_id
+    if (parentComment.resource_type === 'song') {
+      replyCommentData.song_id = parentComment.song_id;
+    }
+    // 关键日志：确认构建的parent_id
+    console.log(`[${getNow()}] 📌 构建回复数据 - parent_id：${replyCommentData.parent_id} | 类型：${typeof replyCommentData.parent_id}`);
+
+    // 5. 保存回复评论（禁用setDefaultsOnInsert，避免默认值覆盖）
+    const replyComment = await new Comment(replyCommentData).save({
+      setDefaultsOnInsert: false // 🔴 禁用插入时的默认值，确保parent_id不被null覆盖
+    });
+    // 关键日志：确认保存后的parent_id
+    console.log(`[${getNow()}] ✅ 回复评论保存成功 - 回复ID：${replyComment._id} | 最终存储的parent_id：${replyComment.parent_id} | 父评论ID：${parentComment._id}`);
+
+    // 6. 响应：统一使用parentId字段，避免冗余
+res.json({
+  code: 200,
+  msg: '回复发布成功',
+  data: {
+    replyId: replyComment._id,
+    parentId: parentComment._id.toString(), // 父评论ID，字符串格式
+    resourceType: parentComment.resource_type,
+    resourceId: parentComment.resource_id,
+    username: username,
+    nick_name: nick_name,
+    avatar: avatar,
+    // ✅ 修改这里：使用构建数据中的被回复人信息
+    reply_to_user_id: replyCommentData.reply_to_user_id,
+    reply_to_name: replyCommentData.reply_to_name,
+    content: replyComment.content,
+    createdAt: replyComment.createdAt,
+    likeCount: replyComment.likeCount
+  }
+});
+
+  } catch (err) {
+    // 错误日志：捕获所有异常
+    console.error(`[${getNow()}] ❌ 回复评论失败 - 错误：${err.message} | 栈信息：${err.stack}`);
+    if (err.name === 'CastError' && err.path === '_id') {
+      return res.status(400).json({
+        code: 400,
+        msg: '评论ID格式错误，请刷新页面后重试',
+        data: null
+      });
+    }
+    next(err);
+  }
+});
+
+// 获取单曲评论列表
 app.get('/api/singles/:singleId/comments', async (req, res, next) => {
   try {
     const { singleId } = req.params;
-    const { page = 1, pageSize = 20 } = req.query;
+    const { page = 1, pageSize = 20, sortBy = 'time', order = 'desc' } = req.query;
     const skip = (page - 1) * pageSize;
 
-    console.log(`[${getNow()}] 📖 获取单曲评论 - 单曲ID：${singleId} | 页码：${page} | 页大小：${pageSize}`);
+    console.log(`[${getNow()}] 📖 获取单曲评论 - 单曲ID：${singleId} | 页码：${page} | 页大小：${pageSize} | 排序：${sortBy} | 顺序：${order}`);
 
     // 1. 校验单曲是否存在
     const singleExist = await Single.findOne({ id: singleId });
     if (!singleExist) throw new AppError('单曲不存在', 404);
 
-    // 2. 查询评论总数
+    // 2. 查询评论总数（只查询主评论）
     const total = await Comment.countDocuments({
       resource_type: 'single',
-      resource_id: singleId
+      resource_id: singleId,
+      parent_id: null
     });
 
-    // 3. 分页查询评论（按时间倒序）
-    const comments = await Comment.find({
-      resource_type: 'single',
-      resource_id: singleId
-    })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(Number(pageSize))
-    .select('username content createdAt likeCount'); // 只返回需要的字段
+    // 3. 构建排序条件
+    let sortCondition = {};
+    if (sortBy === 'like') {
+      // 按点赞数排序
+      sortCondition = { likeCount: order === 'desc' ? -1 : 1 };
+    } else {
+      // 默认按时间排序
+      sortCondition = { createdAt: order === 'desc' ? -1 : 1 };
+    }
 
-    console.log(`[${getNow()}] 📖 获取单曲评论成功 - 单曲ID：${singleId} | 总数量：${total} | 分页数量：${comments.length}`);
+    // 4. 分页查询主评论（按指定条件排序）
+    const mainComments = await Comment.find({
+      resource_type: 'single',
+      resource_id: singleId,
+      parent_id: null
+    })
+    .select('_id username nick_name avatar content createdAt likeCount')
+    .sort(sortCondition)
+    .skip(skip)
+    .limit(Number(pageSize));
+
+    // 5. 为每个主评论查询回复总数
+    const commentsWithRepliesTotal = await Promise.all(
+      mainComments.map(async (comment) => {
+        const repliesTotal = await Comment.countDocuments({
+          parent_id: comment._id
+        });
+        
+        return {
+          ...comment._doc,
+          replies_total: repliesTotal
+        };
+      })
+    );
+
+    console.log(`[${getNow()}] 📖 获取单曲评论成功 - 单曲ID：${singleId} | 总数量：${total} | 分页数量：${commentsWithRepliesTotal.length} | 排序：${sortBy} | 顺序：${order}`);
     res.json({
       code: 200,
       data: {
-        comments,
+        comments: commentsWithRepliesTotal,
         pagination: { 
           page: Number(page), 
           pageSize: Number(pageSize), 
           total, 
           totalPages: Math.ceil(total / pageSize) 
-        }
+        },
+        sort: { sortBy, order } // 返回当前排序信息
       },
       msg: '获取单曲评论成功'
     });
   } catch (err) { next(err); }
 });
-// ===================== 评论接口结束 =====================
 
-// 11. 挂载错误处理中间件
+// 获取专辑评论列表
+
+
+
+// 评论点赞/取消点赞（核心补充）
+// 11.8 评论点赞接口（核心补全）
+// 评论点赞/取消点赞
+app.post('/api/comments/:commentId/like', authMiddleware, async (req, res, next) => {
+  try {
+    const { commentId } = req.params;
+    const { username } = req.user;
+    console.log(`[${getNow()}] 👍 评论点赞操作 - 评论ID：${commentId} | 用户名：${username}`);
+
+    // 1. 校验评论是否存在
+    const comment = await Comment.findById(commentId);
+    if (!comment) throw new AppError('评论不存在', 404);
+
+    // 2. 原子操作：查询并更新点赞记录（存在则删除，不存在则新增）
+    const existingLike = await CommentLike.findOne({ commentId, username });
+    
+    if (existingLike) {
+      // 取消点赞：删除点赞记录 + 评论点赞数-1
+      await Promise.all([
+        CommentLike.deleteOne({ _id: existingLike._id }),
+        Comment.findByIdAndUpdate(commentId, { $inc: { likeCount: -1 } })
+      ]);
+      console.log(`[${getNow()}] ✅ 评论取消点赞成功 - 评论ID：${commentId} | 用户名：${username}`);
+      res.json({ code: 200, msg: '取消点赞成功', data: { isLiked: false } });
+    } else {
+      // 点赞：新增点赞记录 + 评论点赞数+1
+      await Promise.all([
+        new CommentLike({ commentId, username }).save(),
+        Comment.findByIdAndUpdate(commentId, { $inc: { likeCount: 1 } })
+      ]);
+      console.log(`[${getNow()}] ✅ 评论点赞成功 - 评论ID：${commentId} | 用户名：${username}`);
+      res.json({ code: 200, msg: '点赞成功', data: { isLiked: true } });
+    }
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ code: 400, msg: '请勿重复点赞', data: null });
+    }
+    next(err);
+  }
+});
+
+// 查询用户是否点赞了某条评论
+app.get('/api/comments/:commentId/like/status', authMiddleware, async (req, res, next) => {
+  try {
+    const { commentId } = req.params;
+    const { username } = req.user;
+    
+    const likeRecord = await CommentLike.findOne({ commentId, username });
+    const isLiked = !!likeRecord;
+    
+    console.log(`[${getNow()}] 📖 查询评论点赞状态 - 评论ID：${commentId} | 用户名：${username} | 状态：${isLiked ? '已点赞' : '未点赞'}`);
+    res.json({ 
+      code: 200, 
+      data: { isLiked }, 
+      msg: '查询点赞状态成功' 
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 获取特定评论的子评论列表（分页查询）
+app.get('/api/comments/:commentId/replies', async (req, res, next) => {
+  try {
+    const { commentId } = req.params;
+    const { page = 1, pageSize = 10, sortBy = 'time', order = 'asc' } = req.query;
+    
+    console.log(`[${getNow()}] 📖 获取子评论列表 - 父评论ID：${commentId} | 页码：${page} | 每页数量：${pageSize} | 排序：${sortBy} | 顺序：${order}`);
+
+    // 1. 校验分页参数
+    const pageNum = Number(page);
+    const pageSizeNum = Number(pageSize);
+    
+    if (pageNum < 1 || pageSizeNum < 1 || pageSizeNum > 50) {
+      throw new AppError('分页参数无效：页码必须≥1，每页数量必须为1-50', 400);
+    }
+
+    const skip = (pageNum - 1) * pageSizeNum;
+
+    // 2. 校验父评论是否存在
+    const parentComment = await Comment.findById(commentId);
+    if (!parentComment) {
+      console.log(`[${getNow()}] ❌ 父评论不存在 - 评论ID：${commentId}`);
+      throw new AppError('父评论不存在', 404);
+    }
+
+    console.log(`[${getNow()}] 🔍 查询父评论成功 - 用户名：${parentComment.username} | 内容：${parentComment.content.substring(0, 20)}...`);
+
+    // 3. 查询子评论总数
+    const totalReplies = await Comment.countDocuments({ parent_id: commentId });
+    console.log(`[${getNow()}] 📊 子评论统计 - 父评论ID：${commentId} | 总数量：${totalReplies}`);
+
+    // 4. 构建排序条件
+    let sortCondition = {};
+    if (sortBy === 'like') {
+      // 按点赞数排序
+      sortCondition = { likeCount: order === 'desc' ? -1 : 1 };
+    } else {
+      // 默认按时间排序（子评论默认按时间正序）
+      sortCondition = { createdAt: order === 'desc' ? -1 : 1 };
+    }
+
+    // 5. 查询子评论列表（按指定条件排序）
+    const replies = await Comment.find({ parent_id: commentId })
+      .select('_id username nick_name avatar content createdAt likeCount parent_id reply_to_user_id reply_to_name')
+      .sort(sortCondition)
+      .skip(skip)
+      .limit(pageSizeNum);
+
+    console.log(`[${getNow()}] 📋 查询子评论结果 - 父评论ID：${commentId} | 返回数量：${replies.length} | 排序：${sortBy} | 顺序：${order}`);
+
+    // 6. 构建响应数据
+    const responseData = {
+      parentComment: {
+        _id: parentComment._id,
+        username: parentComment.username,
+        nick_name: parentComment.nick_name,
+        content: parentComment.content
+      },
+      replies: replies.map(reply => ({
+        _id: reply._id,
+        username: reply.username,
+        nick_name: reply.nick_name,
+        avatar: reply.avatar,
+        content: reply.content,
+        createdAt: reply.createdAt,
+        likeCount: reply.likeCount,
+        parent_id: reply.parent_id,
+        reply_to_user_id: reply.reply_to_user_id,
+        reply_to_name: reply.reply_to_name
+      })),
+      pagination: {
+        page: pageNum,
+        pageSize: pageSizeNum,
+        total: totalReplies,
+        totalPages: Math.ceil(totalReplies / pageSizeNum)
+      },
+      sort: { sortBy, order } // 返回当前排序信息
+    };
+
+    console.log(`[${getNow()}] ✅ 获取子评论成功 - 父评论ID：${commentId} | 返回子评论数：${replies.length} | 总页数：${responseData.pagination.totalPages} | 排序：${sortBy} | 顺序：${order}`);
+    
+    res.json({
+      code: 200,
+      data: responseData,
+      msg: '获取子评论成功'
+    });
+  } catch (err) { next(err); }
+});
+// 11.9 评论管理接口（编辑/删除）
+// 编辑评论
+app.put('/api/comments/:commentId', authMiddleware, async (req, res, next) => {
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+    const { username } = req.user;
+    
+    console.log(`[${getNow()}] ✏️ 编辑评论 - 评论ID：${commentId} | 用户名：${username}`);
+
+    // 1. 校验参数
+    if (!content || content.trim().length === 0) {
+      throw new AppError('评论内容不能为空', 400);
+    }
+    if (content.length > 500) {
+      throw new AppError('评论内容不能超过500字', 400);
+    }
+
+    // 2. 校验评论归属权
+    const comment = await Comment.findById(commentId);
+    if (!comment) throw new AppError('评论不存在', 404);
+    if (comment.username !== username) {
+      throw new AppError('无权编辑他人评论', 403);
+    }
+
+    // 3. 更新评论内容
+    const updatedComment = await Comment.findByIdAndUpdate(
+      commentId,
+      { content: content.trim(), updatedAt: Date.now() },
+      { new: true, runValidators: true }
+    );
+
+    console.log(`[${getNow()}] ✅ 评论编辑成功 - 评论ID：${commentId} | 用户名：${username}`);
+    res.json({
+      code: 200,
+      msg: '评论编辑成功',
+      data: {
+        commentId: updatedComment._id,
+        content: updatedComment.content,
+        updatedAt: updatedComment.updatedAt
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 删除评论（级联删除回复和点赞记录）
+app.delete('/api/comments/:commentId', authMiddleware, async (req, res, next) => {
+  try {
+    const { commentId } = req.params;
+    const { username } = req.user;
+    
+    console.log(`[${getNow()}] 🗑️ 删除评论 - 评论ID：${commentId} | 用户名：${username}`);
+
+    // 1. 校验评论归属权
+    const comment = await Comment.findById(commentId);
+    if (!comment) throw new AppError('评论不存在', 404);
+    if (comment.username !== username) {
+      throw new AppError('无权删除他人评论', 403);
+    }
+
+    // 2. 级联删除：主评论+回复+点赞记录
+    await Promise.all([
+      // 删除主评论
+      Comment.deleteOne({ _id: commentId }),
+      // 删除该评论的所有回复
+      Comment.deleteMany({ parent_id: commentId }),
+      // 删除该评论的所有点赞记录
+      CommentLike.deleteMany({ commentId })
+    ]);
+
+    console.log(`[${getNow()}] ✅ 评论删除成功（含回复和点赞）- 评论ID：${commentId} | 用户名：${username}`);
+    res.json({
+      code: 200,
+      msg: '评论删除成功',
+      data: { commentId }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 12. 兜底路由（404处理，放在所有接口之后）
+
+
+// 13. 注册全局错误处理中间件（核心：必须放在所有路由之后）
 app.use(errorHandler);
 
-// 12. 最终版启动逻辑（修复端口监听注释错误，保留原有所有逻辑）
+// 14. 数据库连接 + 服务启动（程序入口）
 async function startServer() {
   try {
-    // 仅一次MongoDB连接
+    // 连接MongoDB
     await mongoose.connect(MONGODB_URL);
-    console.log(`[${getNow()}] ✅ MongoDB连接成功（数据库：tao_zhe_official）`);
-    console.log(`[${getNow()}] 📌 MongoDB连接状态：已连接（状态码：${mongoose.connection.readyState}）`);
+    console.log(`[${getNow()}] 🛡️ MongoDB连接成功 - 地址：${MONGODB_URL}`);
 
-    // 启动服务器，绑定0.0.0.0:3000（修正原有注释错误，PORT是3000）
-    const server = app.listen(PORT, '0.0.0.0', async () => {
-      console.log(`[${getNow()}] 🎉 服务器已启动：http://0.0.0.0:${PORT}`);
-      // 执行数据入库，捕获错误
-      try {
-        //await initData();
-      } catch (initErr) {
-        console.error(`[${getNow()}] ❌ 数据入库失败：`, initErr.stack);
-      }
+    // 初始化静态数据（专辑/歌曲/单曲）
+    await initData();
+
+    // 启动HTTP服务
+    app.listen(PORT, () => {
+      console.log(`[${getNow()}] 🚀 服务启动成功 - 端口：${PORT} | 访问地址：http://localhost:${PORT}`);
+      console.log(`[${getNow()}] 📌 允许跨域的前端地址：http://127.0.0.1:5500、http://localhost:5500`);
     });
-
-    // 监听服务器错误（如端口占用）
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`[${getNow()}] ❌ 端口 ${PORT} 已被占用，请更换端口（如3002）`);
-      } else {
-        console.error(`[${getNow()}] ❌ 服务器运行错误：`, err.stack);
-      }
-      process.exit(1);
-    });
-
   } catch (err) {
-    console.error(`[${getNow()}] ❌ 启动失败：`, err.stack);
-    process.exit(1);
+    console.error(`[${getNow()}] ❌ 服务启动失败：`, err.stack);
+    process.exit(1); // 启动失败退出进程
   }
 }
 
-// 执行启动函数
+// 启动服务
 startServer();
+
+// 全局未捕获异常处理
+process.on('uncaughtException', (err) => {
+  console.error(`[${getNow()}] 🚨 未捕获异常：`, err.stack);
+  process.exit(1);
+});
+
+// 全局未处理Promise拒绝处理
+process.on('unhandledRejection', (reason, promise) => {
+  console.error(`[${getNow()}] 🚨 未处理Promise拒绝 - Promise：`, promise, ' | 原因：', reason.stack);
+  process.exit(1);
+});

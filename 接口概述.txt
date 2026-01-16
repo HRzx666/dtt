@@ -1,0 +1,444 @@
+认证说明
+认证方式: JWT Token
+Token传递: 通过Cookie自动传递（withCredentials: true）
+需要认证的接口: 点赞、编辑、删除、发表评论
+📝 评论相关接口
+1. 获取专辑评论列表
+接口地址: GET /api/albums/:albumId/comments
+
+请求参数:
+
+参数名	类型	必填	说明	默认值
+albumId	string	是	专辑ID	-
+page	number	否	页码	1
+pageSize	number	否	每页数量	10
+响应示例:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "获取专辑评论成功",
+  "data": {
+    "comments": [
+      {
+        "_id": "评论ID",
+        "username": "用户名",
+        "nick_name": "昵称",
+        "avatar": "头像URL",
+        "content": "评论内容",
+        "createdAt": "创建时间",
+        "likeCount": 点赞数,
+        "replies_total": 回复总数
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "pageSize": 10,
+      "total": 50,
+      "totalPages": 5
+    }
+  }
+}
+前端调用示例:
+
+
+javascript
+Apply
+async function loadAlbumComments(albumId, page = 1, pageSize = 10) {
+  try {
+    const response = await axios.get(
+      `http://localhost:3000/api/albums/${albumId}/comments?page=${page}&pageSize=${pageSize}`,
+      { withCredentials: true }
+    );
+    return response.data.data;
+  } catch (error) {
+    console.error('加载评论失败:', error);
+    return null;
+  }
+}
+2. 发表评论
+接口地址: POST /api/comments
+
+请求参数:
+
+参数名	类型	必填	说明
+content	string	是	评论内容（1-500字）
+resource_id	string	是	资源ID（专辑ID）
+parent_id	string	否	父评论ID（回复时使用）
+reply_to_user_id	string	否	回复目标用户ID
+reply_to_name	string	否	回复目标用户名
+请求示例:
+
+
+json
+Apply
+{
+  "content": "这是一条评论",
+  "resource_id": "专辑ID",
+  "parent_id": "父评论ID", // 可选，回复时使用
+  "reply_to_user_id": "目标用户ID", // 可选
+  "reply_to_name": "目标用户名" // 可选
+}
+响应示例:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "评论发表成功",
+  "data": {
+    "commentId": "新评论ID",
+    "content": "评论内容",
+    "createdAt": "创建时间"
+  }
+}
+前端调用示例:
+
+
+javascript
+Apply
+async function submitComment(content, albumId, parentId = null, replyTo = null) {
+  try {
+    const requestData = {
+      content: content.trim(),
+      resource_id: albumId
+    };
+    
+    // 如果是回复评论
+    if (parentId) {
+      requestData.parent_id = parentId;
+      if (replyTo) {
+        requestData.reply_to_user_id = replyTo.userId;
+        requestData.reply_to_name = replyTo.username;
+      }
+    }
+    
+    const response = await axios.post(
+      'http://localhost:3000/api/comments',
+      requestData,
+      { withCredentials: true }
+    );
+    
+    return response.data.data;
+  } catch (error) {
+    console.error('发表评论失败:', error);
+    return null;
+  }
+}
+3. 获取特定评论的子评论列表
+接口地址: GET /api/comments/:commentId/replies
+
+请求参数:
+
+参数名	类型	必填	说明	默认值	限制
+commentId	string	是	父评论ID	-	-
+page	number	否	页码	1	≥1
+pageSize	number	否	每页数量	10	1-50
+响应示例:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "获取子评论成功",
+  "data": {
+    "parentComment": {
+      "_id": "父评论ID",
+      "username": "父评论用户名",
+      "nick_name": "父评论昵称",
+      "content": "父评论内容"
+    },
+    "replies": [
+      {
+        "_id": "回复ID",
+        "username": "回复者用户名",
+        "nick_name": "回复者昵称",
+        "avatar": "回复者头像",
+        "content": "回复内容",
+        "createdAt": "回复时间",
+        "likeCount": 点赞数,
+        "parent_id": "父评论ID",
+        "reply_to_user_id": "回复目标用户ID",
+        "reply_to_name": "回复目标用户名"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "pageSize": 10,
+      "total": 25,
+      "totalPages": 3
+    }
+  }
+}
+前端调用示例:
+
+
+javascript
+Apply
+async function loadCommentReplies(commentId, page = 1, pageSize = 10) {
+  try {
+    const safePageSize = Math.min(pageSize, 50);
+    const response = await axios.get(
+      `http://localhost:3000/api/comments/${commentId}/replies?page=${page}&pageSize=${safePageSize}`,
+      { withCredentials: true }
+    );
+    
+    if (response.data.code === 200) {
+      return response.data.data;
+    }
+    return null;
+  } catch (error) {
+    console.error('加载回复失败:', error);
+    return null;
+  }
+}
+4. 评论点赞/取消点赞
+接口地址: POST /api/comments/:commentId/like
+
+请求参数:
+
+参数名	类型	必填	说明
+commentId	string	是	评论ID
+响应示例:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "点赞成功",
+  "data": {
+    "isLiked": true
+  }
+}
+前端调用示例:
+
+
+javascript
+Apply
+async function toggleCommentLike(commentId) {
+  try {
+    const response = await axios.post(
+      `http://localhost:3000/api/comments/${commentId}/like`,
+      {},
+      { withCredentials: true }
+    );
+    
+    return response.data.data.isLiked;
+  } catch (error) {
+    console.error('点赞操作失败:', error);
+    return null;
+  }
+}
+5. 查询点赞状态
+接口地址: GET /api/comments/:commentId/like/status
+
+请求参数:
+
+参数名	类型	必填	说明
+commentId	string	是	评论ID
+响应示例:
+
+
+json
+Apply
+{
+  "code": 200,
+  "data": {
+    "isLiked": true
+  },
+  "msg": "查询点赞状态成功"
+}
+前端调用示例:
+
+
+javascript
+Apply
+async function checkLikeStatus(commentId) {
+  try {
+    const response = await axios.get(
+      `http://localhost:3000/api/comments/${commentId}/like/status`,
+      { withCredentials: true }
+    );
+    
+    return response.data.data.isLiked;
+  } catch (error) {
+    console.error('查询点赞状态失败:', error);
+    return false;
+  }
+}
+6. 编辑评论
+接口地址: PUT /api/comments/:commentId
+
+请求参数:
+
+参数名	类型	必填	说明
+commentId	string	是	评论ID
+content	string	是	新评论内容（1-500字）
+请求示例:
+
+
+json
+Apply
+{
+  "content": "修改后的评论内容"
+}
+响应示例:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "评论编辑成功",
+  "data": {
+    "commentId": "评论ID",
+    "content": "新评论内容",
+    "updatedAt": "更新时间"
+  }
+}
+前端调用示例:
+
+
+javascript
+Apply
+async function editComment(commentId, newContent) {
+  try {
+    const response = await axios.put(
+      `http://localhost:3000/api/comments/${commentId}`,
+      { content: newContent.trim() },
+      { withCredentials: true }
+    );
+    
+    return response.data.data;
+  } catch (error) {
+    console.error('编辑评论失败:', error);
+    return null;
+  }
+}
+7. 删除评论
+接口地址: DELETE /api/comments/:commentId
+
+请求参数:
+
+参数名	类型	必填	说明
+commentId	string	是	评论ID
+响应示例:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "评论删除成功",
+  "data": {
+    "commentId": "被删除的评论ID"
+  }
+}
+前端调用示例:
+
+
+javascript
+Apply
+async function deleteComment(commentId) {
+  try {
+    const response = await axios.delete(
+      `http://localhost:3000/api/comments/${commentId}`,
+      { withCredentials: true }
+    );
+    
+    return response.data.data.commentId;
+  } catch (error) {
+    console.error('删除评论失败:', error);
+    return null;
+  }
+}
+⚠️ 错误码说明
+错误码	说明	可能原因
+200	成功	操作成功
+400	请求参数错误	参数缺失、格式错误、内容过长等
+401	未授权	未登录或Token失效
+403	禁止访问	无权操作他人评论
+404	资源不存在	评论或专辑不存在
+500	服务器内部错误	服务器异常
+🔧 前端配置建议
+1. Axios全局配置
+
+javascript
+Apply
+// 设置基础URL和认证配置
+axios.defaults.baseURL = 'http://localhost:3000';
+axios.defaults.withCredentials = true; // 自动传递Cookie
+2. 错误处理封装
+
+javascript
+Apply
+// 统一的错误处理函数
+function handleApiError(error, defaultMessage = '操作失败') {
+  if (error.response) {
+    const message = error.response.data.msg || defaultMessage;
+    showErrorTip(message);
+  } else if (error.request) {
+    showErrorTip('网络连接错误，请检查网络');
+  } else {
+    showErrorTip(defaultMessage);
+  }
+  console.error('API错误:', error);
+}
+3. 评论内容验证
+
+javascript
+Apply
+function validateCommentContent(content) {
+  const trimmed = content.trim();
+  if (trimmed.length === 0) {
+    return { valid: false, message: '评论内容不能为空' };
+  }
+  if (trimmed.length > 500) {
+    return { valid: false, message: '评论内容不能超过500字' };
+  }
+  return { valid: true, message: '' };
+}
+📱 前端交互流程示例
+1. 加载评论列表
+
+javascript
+Apply
+// 页面加载时调用
+async function initComments(albumId) {
+  const commentsData = await loadAlbumComments(albumId);
+  if (commentsData) {
+    renderComments(commentsData.comments);
+    setupPagination(commentsData.pagination);
+  }
+}
+2. 回复评论流程
+
+javascript
+Apply
+// 点击回复按钮
+function onReplyClick(commentId, replyToName) {
+  // 显示回复表单
+  toggleReplyForm(commentId, replyToName);
+  
+  // 加载回复列表（如果还没加载过）
+  if (!isRepliesLoaded(commentId)) {
+    loadAndDisplayReplies(commentId);
+  }
+}
+
+// 提交回复
+async function onSubmitReply(parentCommentId, content, replyTo) {
+  const result = await submitComment(content, albumId, parentCommentId, replyTo);
+  if (result) {
+    // 刷新回复列表
+    await loadAndDisplayReplies(parentCommentId);
+    // 隐藏回复表单
+    toggleReplyForm(parentCommentId);
+    showSuccessTip('回复成功');
+  }
+}

@@ -5,15 +5,13 @@ const User = require('./model');
 const { AppError } = require('../middleware/error.middleware');
 const { generateToken } = require('../middleware/auth.middleware');
 
-// 加密盐值轮数（越高越安全，性能越低，默认10即可）
 const SALT_ROUNDS = 10;
 
-// 1. 注册接口
+// 1. 注册接口（原有逻辑不变）
 router.post('/api/user/register', async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    // 基础参数校验
     if (!username || !password) {
       throw new AppError('用户名和密码不能为空');
     }
@@ -24,23 +22,19 @@ router.post('/api/user/register', async (req, res, next) => {
       throw new AppError('密码至少6位');
     }
 
-    // 检查用户名是否已存在
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       throw new AppError('用户名已存在');
     }
 
-    // 密码加密
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // 创建新用户
     const newUser = new User({
       username,
-      password: hashedPassword // 存储加密后的密码
+      password: hashedPassword
     });
     await newUser.save();
 
-    // 返回注册成功
     res.json({
       code: 200,
       msg: '注册成功',
@@ -48,43 +42,37 @@ router.post('/api/user/register', async (req, res, next) => {
     });
 
   } catch (err) {
-    // 交给统一错误处理中间件
     next(err);
   }
 });
 
-// 2. 登录接口
+// 2. 登录接口（原有逻辑不变）
 router.post('/api/user/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    // 基础参数校验
     if (!username || !password) {
       throw new AppError('用户名和密码不能为空');
     }
 
-    // 查找用户
     const user = await User.findOne({ username });
     if (!user) {
       throw new AppError('用户名不存在');
     }
 
-    // 校验密码（加密对比）
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new AppError('密码错误');
     }
 
-    // 生成JWT token
     const token = generateToken(user.username);
 
-    // 登录成功返回（token需前端存储）
     res.json({
       code: 200,
       msg: '登录成功',
       data: { 
         username: user.username,
-        token: token // 返回token
+        token: token 
       }
     });
 
@@ -93,14 +81,81 @@ router.post('/api/user/login', async (req, res, next) => {
   }
 });
 
-// 3. 测试接口：获取当前登录用户信息（需鉴权）
-router.get('/api/user/info', require('../middleware/auth.middleware').authMiddleware, (req, res) => {
-  // req.user由鉴权中间件挂载
-  res.json({
-    code: 200,
-    msg: '获取用户信息成功',
-    data: { username: req.user.username }
-  });
+// 3. 获取用户信息接口（修改：返回昵称、头像）
+router.get('/api/user/info', require('../middleware/auth.middleware').authMiddleware, async (req, res, next) => {
+  try {
+    // 根据鉴权中间件的req.user.username查询完整用户信息
+    const user = await User.findOne(
+      { username: req.user.username },
+      'username nickname avatar createdAt' // 只返回需要的字段，排除password
+    );
+
+    if (!user) {
+      throw new AppError('用户不存在');
+    }
+
+    res.json({
+      code: 200,
+      msg: '获取用户信息成功',
+      data: { 
+        username: user.username,
+        nickname: user.nickname || '未设置', // 无昵称显示"未设置"
+        avatar: user.avatar || '',
+        createdAt: user.createdAt
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ========== 新增：用户信息更新接口（昵称/头像） ==========
+router.post('/api/user/update', require('../middleware/auth.middleware').authMiddleware, async (req, res, next) => {
+  try {
+    const { nickname, avatar } = req.body;
+    const username = req.user.username; // 从鉴权中间件获取当前登录用户
+
+    // 校验昵称（如果传了昵称）
+    if (nickname) {
+      if (nickname.length < 2 || nickname.length > 10) {
+        throw new AppError('昵称长度需在2-10个字符之间');
+      }
+    }
+
+    // 构建更新对象（只更新传了的字段）
+    const updateData = {};
+    if (nickname !== undefined) updateData.nickname = nickname;
+    if (avatar !== undefined) updateData.avatar = avatar;
+
+    // 空更新校验
+    if (Object.keys(updateData).length === 0) {
+      throw new AppError('请传入需要更新的字段（昵称/头像）');
+    }
+
+    // 更新用户信息（Mongoose的findOneAndUpdate）
+    const updatedUser = await User.findOneAndUpdate(
+      { username: username }, // 查询条件：当前登录用户
+      { $set: updateData },   // 更新操作
+      { new: true, runValidators: true } // 返回更新后的文档 + 执行字段校验
+    ).select('username nickname avatar'); // 只返回需要的字段
+
+    if (!updatedUser) {
+      throw new AppError('用户不存在');
+    }
+
+    // 返回更新成功结果
+    res.json({
+      code: 200,
+      msg: '信息更新成功',
+      data: {
+        nickname: updatedUser.nickname,
+        avatar: updatedUser.avatar
+      }
+    });
+
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

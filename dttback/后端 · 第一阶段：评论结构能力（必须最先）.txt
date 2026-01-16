@@ -1,0 +1,218 @@
+后端获取子评论数据的核心函数
+在 songs-details.html 文件中，loadCommentReplies 函数负责从后端获取子评论数据：
+
+
+songs-details.html
+Apply
+/**
+ * 加载指定父评论的子评论（调用接口）
+ * @param {string} commentId - 父评论ID
+ * @param {number} page - 页码，默认1
+ * @param {number} pageSize - 每页数量，默认10（最大50）
+ * @returns {Promise<Object>} 子评论数据（包含parentComment、replies、pagination）
+ */
+async function loadCommentReplies(commentId, page = 1, pageSize = 10) {
+  console.group(`【回复功能】【加载回复】 开始加载父评论的回复列表，父评论ID=${commentId}`);
+  console.log(`【回复功能】【加载回复】 请求参数：page=${page}, pageSize=${pageSize}`);
+  try {
+    // 限制pageSize最大为50（接口要求）
+    const safePageSize = Math.min(pageSize, 50);
+    const reqUrl = `http://localhost:3000/api/comments/${commentId}/replies?page=${page}&pageSize=${safePageSize}`;
+    console.log(`【回复功能】【加载回复】 请求地址=${reqUrl}`);
+    const response = await axios.get(reqUrl, {
+      withCredentials: true,
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    console.log(`【回复功能】【加载回复】 请求成功，响应状态=${response.status}, 响应数据=`, response.data);
+    
+    if (response.data.code === 200) {
+      const replyCount = response.data.data.pagination?.total || 0;
+      console.log(`【回复功能】【加载回复】 加载成功，共${replyCount}条回复数据`);
+      console.groupEnd();
+      return response.data.data;
+    } else {
+      console.warn(`【回复功能】【加载回复】 加载失败，业务错误=${response.data.msg}`);
+      showCommentTip(`加载回复失败: ${response.data.msg}`, 'error');
+      console.groupEnd();
+      return null;
+    }
+  } catch (error) {
+    console.error(`【回复功能】【加载回复】 加载子评论接口请求失败，错误详情=`, error);
+    showCommentTip(`加载回复失败：请求地址不存在或后端未实现\n${error.config?.url || '未知地址'}`, 'error');
+    console.groupEnd();
+    return null;
+  }
+}
+2. 渲染子评论的核心函数
+renderReplyItem 函数负责将后端返回的数据渲染为可视化的DOM元素：
+
+
+songs-details.html
+Apply
+/**
+ * 渲染单条回复内容（评论的子回复）
+ * @param {Object} reply - 回复数据对象
+ * @param {HTMLElement} container - 回复列表容器
+ * @param {boolean} insertToTop - 是否插入到列表顶部
+ * @returns {HTMLElement} 渲染后的回复DOM元素
+ */
+function renderReplyItem(reply, container, insertToTop = false) {
+  console.group(`【回复渲染】【子回复渲染】 开始渲染单条回复，回复ID=${reply._id}, 父评论ID=${reply.parent_id}`);
+  if (!reply || !container) {
+    console.error(`【回复渲染】【子回复渲染】 回复数据或容器为空，终止渲染`);
+    console.groupEnd();
+    return null;
+  }
+  
+  // 创建回复DOM节点
+  const replyItem = document.createElement('div');
+  replyItem.className = `reply-item ${reply.isTemp ? 'temp-reply' : ''}`;
+  replyItem.dataset.replyId = reply._id;
+  replyItem.dataset.parentId = reply.parent_id;
+
+  // 获取当前缓存用户，判断是否是自己的回复
+  const cacheUser = getUserFromCache();
+  const isCurrentUserReply = cacheUser && cacheUser.username === reply.username;
+  const userName = isCurrentUserReply ? cacheUser.nick_name : (reply.nick_name || reply.username || '匿名用户');
+  const avatarUrl = isCurrentUserComment ? cacheUser.avatar : reply.avatar;
+
+  // 组装头像HTML
+  let avatarHtml = getDefaultAvatar(userName);
+  if (avatarUrl) {
+    avatarHtml = `<img src="${avatarUrl}" alt="${userName}" onerror="this.parentNode.innerHTML='${getDefaultAvatar(userName)}'">`;
+  }
+
+  // 处理回复的@用户前缀
+  let replyContent = reply.content || '无内容';
+  if (reply.reply_to_name && replyContent.startsWith(`@${reply.reply_to_name}`)) {
+    replyContent = replyContent.replace(`@${reply.reply_to_name}`, `<span class="reply-at-user">@${reply.reply_to_name}</span>`);
+  }
+
+  // 修复：回复点赞数默认值0，避免NaN
+  const replyLikeCount = parseInt(reply.likeCount || '0', 10);
+
+  // 组装回复完整HTML结构
+  replyItem.innerHTML = `
+    <div class="reply-avatar">${avatarHtml}</div>
+    <div class="reply-content-wrapper">
+      <div class="reply-header">
+        <span class="reply-nickname">${userName}</span>
+        <span class="reply-time">${formatCommentTime(reply.createdAt)}</span>
+      </div>
+      <div class="reply-content">${replyContent}</div>
+      <div class="reply-actions">
+        <button class="like-btn" data-reply-id="${reply._id}">
+          <span class="heart-icon ${reply.likedByMe ? 'liked' : ''}">❤️</span>
+          <span class="reply-like-count">${isNaN(replyLikeCount) ? 0 : replyLikeCount}</span>
+        </button>
+        <button class="reply-btn reply-to-reply-btn" data-reply-id="${reply._id}" data-parent-id="${reply.parent_id}" data-reply-to="${userName}">
+          <span>💬</span><span>回复</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  // 插入到容器的顶部/底部
+  if (insertToTop) {
+    container.insertBefore(replyItem, container.firstChild);
+    replyItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    container.appendChild(replyItem);
+  }
+
+  // 绑定点赞事件和回复事件
+  const likeBtn = replyItem.querySelector(`.like-btn[data-reply-id="${reply._id}"]`);
+  const heartIcon = replyItem.querySelector('.heart-icon');
+  const likeCountEl = replyItem.querySelector('.reply-like-count');
+  if (likeBtn && heartIcon && likeCountEl) {
+    likeBtn.addEventListener('click', () => {
+      const realReplyId = likeBtn.dataset.replyId;
+      handleCommentLike(realReplyId, likeBtn, heartIcon, likeCountEl);
+    });
+  }
+
+  const replyBtn = replyItem.querySelector('.reply-to-reply-btn');
+  if (replyBtn) {
+    replyBtn.addEventListener('click', () => {
+      const parentId = replyBtn.dataset.parentId;
+      const replyToName = replyBtn.dataset.replyTo;
+      toggleReplyForm(parentId, replyToName);
+    });
+  }
+
+  console.log(`【回复渲染】【子回复渲染】 回复渲染完成，DOM元素插入成功`);
+  console.groupEnd();
+  return replyItem;
+}
+3. 完整的子评论加载和渲染流程
+当用户点击"展开回复"按钮时，会触发以下完整流程：
+
+
+songs-details.html
+Apply
+// 绑定展开/折叠回复按钮事件
+const toggleRepliesBtn = item.querySelector('.toggle-replies-btn');
+if (toggleRepliesBtn) {
+  toggleRepliesBtn.addEventListener('click', async () => {
+    const commentId = toggleRepliesBtn.dataset.commentId;
+    const repliesList = item.querySelector('.replies-list');
+    const emptyRepliesTip = item.querySelector('.empty-replies-tip');
+    const replyCount = parseInt(toggleRepliesBtn.dataset.replyCount || '0', 10);
+
+    if (repliesList) {
+      toggleRepliesList(toggleRepliesBtn, repliesList, replyCount);
+      return;
+    }
+
+    toggleRepliesBtn.disabled = true;
+    toggleRepliesBtn.innerHTML = '<span>⏳</span><span>加载中...</span>';
+
+    try {
+      // 1. 从后端获取子评论数据
+      const replyData = await loadCommentReplies(commentId, 1, 10);
+      if (!replyData) return;
+
+      // 2. 创建回复列表容器
+      const newRepliesList = document.createElement('div');
+      newRepliesList.className = 'replies-list';
+
+      if (emptyRepliesTip) {
+        emptyRepliesTip.parentNode.replaceChild(newRepliesList, emptyRepliesTip);
+      }
+
+      const realReplyCount = parseInt(replyData.pagination?.total || '0', 10);
+      toggleRepliesBtn.dataset.replyCount = realReplyCount;
+
+      // 3. 渲染每条子评论
+      if (replyData.replies && replyData.replies.length > 0) {
+        replyData.replies.forEach(reply => {
+          if (!reply.parent_id || reply.parent_id !== commentId) {
+            reply.parent_id = commentId;
+          }
+          // 调用renderReplyItem函数渲染单条回复
+          renderReplyItem(reply, newRepliesList, false);
+        });
+      } else {
+        // 无回复时显示空提示
+        const emptyTip = document.createElement('div');
+        emptyTip.className = 'empty-replies-tip';
+        emptyTip.style.cssText = 'padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;';
+        emptyTip.textContent = '暂无回复，快来抢沙发吧～';
+        newRepliesList.appendChild(emptyTip);
+      }
+
+      // 4. 切换列表状态
+      toggleRepliesList(toggleRepliesBtn, newRepliesList, realReplyCount);
+    } catch (err) {
+      console.error('加载回复列表失败:', err);
+      showCommentTip('加载回复失败，请重试', 'error');
+    } finally {
+      toggleRepliesBtn.disabled = false;
+      const finalCount = parseInt(toggleRepliesBtn.dataset.replyCount || '0', 10);
+      toggleRepliesBtn.innerHTML = finalCount > 0 ? `<span>📥</span><span>收起回复(${finalCount})</span>` : `<span>📤</span><span>展开回复</span>`;
+    }
+  });
+}

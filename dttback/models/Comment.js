@@ -1,25 +1,54 @@
-// models/Comment.js
 const mongoose = require('mongoose');
 
-// 评论数据模型
 const commentSchema = new mongoose.Schema({
-  song_id: { 
-    type: String, 
-    required: true, 
-    index: true // 索引优化：加快按歌曲ID查询评论
+  // 资源类型：song/album/single（区分单曲/专辑/单曲）
+  resourceType: {
+    type: String,
+    required: true,
+    enum: ['song', 'album', 'single'], // 扩展支持单曲
+    default: 'song'
   },
-  resource_type: { type: String, default: 'song' }, // 区分资源类型（歌曲/专辑）
-  username: { type: String, required: true }, // 评论者用户名
-  content: { 
-    type: String, 
-    required: true, 
-    trim: true,
-    maxlength: 500 // 限制评论最大长度
+  // 资源ID（单曲ID/专辑ID/单曲ID）
+  resourceId: {
+    type: String,
+    required: true
   },
-  create_time: { type: Date, default: Date.now } // 评论发布时间
+  // 用户相关字段
+  username: { type: String, required: true }, // 用户名（兜底）
+  nick_name: { type: String, required: true }, // 用户昵称（前端显示用）
+  avatar: { type: String, default: '' }, // 用户头像（base64/URL）
+  // 评论内容
+  content: { type: String, required: true, maxlength: 500 },
+  // 点赞数
+  likeCount: { type: Number, default: 0 },
+  // 回复相关字段（按照文档要求重构）
+  parent_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment',
+    default: null
+  },
+  // 回复目标评论ID（reply_to_comment）
+  reply_to_comment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment',
+    default: null
+  },
+  // 回复目标用户ID（reply_to_user）
+  reply_to_user: {
+    type: String,
+    default: ''
+  },
+  // 回复目标用户名（用于显示）
+  reply_to_name: {
+    type: String,
+    default: ''
+  },
+  createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-// 按“歌曲ID+发布时间”排序的索引
-commentSchema.index({ song_id: 1, create_time: -1 });
+// 索引优化
+commentSchema.index({ resourceType: 1, resourceId: 1, createdAt: -1 });
+commentSchema.index({ parent_id: 1, createdAt: -1 });
+commentSchema.index({ reply_to_comment: 1 });
 
 module.exports = mongoose.model('Comment', commentSchema);

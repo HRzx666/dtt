@@ -6,23 +6,23 @@
     <title>陶喆</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* 仅新增/调整歌曲列表相关样式（和列表页对齐），不修改任何原有样式 */
-        /* 歌曲行点击样式 */
+        /* 仅新增/调整歌曲列表相关样式（和列表页完全对齐），不修改任何原有样式 */
+        /* 歌曲行点击样式（和列表页一致） */
         .song-item {
             cursor: pointer;
             transition: background-color 0.2s ease;
         }
         .song-item:hover {
-            background-color: #f8f9fa;
+            background-color: #f8faff; /* 和列表页hover背景一致 */
         }
-        /* 加载提示样式 */
+        /* 加载提示样式（和列表页一致） */
         .tip-row {
             text-align: center;
-            padding: 2rem !important;
+            padding: 4rem !important; /* 和列表页一致 */
             color: #64748b;
             font-style: italic;
         }
-        /* 评分徽章样式（和列表页一致） */
+        /* 评分徽章样式（和列表页完全一致） */
         .score-badge {
             display: inline-flex;
             align-items: center;
@@ -46,6 +46,27 @@
         }
         .horizontal-only-table {
             width: 100%;
+            border-collapse: separate; /* 和列表页一致 */
+            border-spacing: 0;
+        }
+        /* 表格表头样式（和列表页对齐） */
+        .horizontal-only-table th {
+            background-color: #f8fafc;
+            color: #64748b;
+            padding: 1rem 1.25rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        /* 表格单元格样式（和列表页对齐） */
+        .horizontal-only-table td {
+            padding: 1.25rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.925rem;
+            transition: all 0.2s ease;
         }
         /* 响应式隐藏发行时间（和列表页一致） */
         @media (max-width: 640px) {
@@ -63,8 +84,17 @@
             <li><a href="about.html">专辑</a></li>
             <li><a href="songs-list.html">评分</a></li>
         </ul>
-        <div class="auth-buttons">
-            <a href="login.html" class="register-btn">登录</a>
+        <div class="auth-buttons" id="authContainer">
+            <!-- 初始显示登录按钮，登录后动态替换为头像 -->
+            <a href="login.html" class="register-btn" id="loginBtn">登录</a>
+            <!-- 头像容器（默认隐藏） -->
+            <div class="avatar-container" id="avatarContainer" style="display: none;">
+                <img src="" alt="用户头像" id="navAvatar" class="nav-avatar">
+                <div class="avatar-dropdown">
+                    <a href="user-profile.html">个人中心</a>
+                    <a href="javascript:logout()" id="logoutLink">退出登录</a>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -110,7 +140,7 @@
     <section class="section-remengequ">
         <div style="padding: 20px;"><h2 style="font-size: 30px;">热门歌曲</h2></div>
         <div class="songs-table-container">
-            <!-- 仅修改表格列结构，和列表页一致 -->
+            <!-- 表格结构和列表页完全一致 -->
             <table class="songs-table horizontal-only-table">
                 <thead>
                     <tr>
@@ -131,13 +161,14 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
-        // 防XSS转义函数
+        // ========== 1. 核心基础函数（和列表页完全对齐） ==========
+        // 防XSS转义函数（和列表页一致）
         function escapeHtml(str) {
             if (!str) return '';
             return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         }
 
-        // 专辑卡片点击跳转（保留原有逻辑）
+        // ========== 2. 专辑卡片点击跳转（保留原有逻辑） ==========
         const zhuanji = document.querySelectorAll('.album-list li ');
         zhuanji.forEach(a => a.classList.add('lyric-line'));
         document.querySelectorAll('.album-list li').forEach(li => {
@@ -147,20 +178,20 @@
             });
         });
 
-        // 动态加载热门歌曲（仅修改：1. pageSize=10 2. 渲染结构和列表页一致 3. 去掉我的评分列）
+        // ========== 3. 热门歌曲加载逻辑（和列表页渲染逻辑对齐，仅显示10首无分页） ==========
         async function loadHotSongs() {
             try {
                 const hotSongsListEl = document.getElementById('hotSongsList');
                 
-                // 请求后端整合接口（第一页，每页10条）
+                // 请求后端接口（固定page=1，pageSize=10，和列表页参数一致）
                 const response = await axios.get('http://localhost:3000/api/all-resources/sort-by-rating', {
                     params: { 
                         page: 1, 
                         pageSize: 10, // 仅显示前10首
-                        _t: Date.now() // 防止缓存
+                        _t: Date.now() // 防止缓存（和列表页一致）
                     },
                     withCredentials: true,
-                    timeout: 10000
+                    timeout: 10000 // 超时时间（和列表页一致）
                 });
 
                 const result = response.data;
@@ -175,17 +206,18 @@
                     return;
                 }
 
-                // 动态渲染歌曲列表（和列表页结构一致）
+                // 动态渲染歌曲列表（结构、类名和列表页完全一致）
                 hotSongsListEl.innerHTML = '';
+                const fragment = document.createDocumentFragment(); // 优化性能（和列表页一致）
                 resources.forEach(item => {
                     const tr = document.createElement('tr');
-                    tr.className = 'song-item'; // 新增类名，适配悬停样式
-                    tr.dataset.songId = item.id; // 绑定歌曲ID
-                    tr.dataset.type = item.type; // 绑定类型（song/single）
+                    tr.className = 'song-item'; // 和列表页类名一致
+                    tr.dataset.songId = item.id;
+                    tr.dataset.type = item.type;
 
-                    // 渲染行内容（和列表页完全一致，去掉我的评分列）
+                    // 渲染结构和列表页完全对齐
                     tr.innerHTML = `
-                        <td class="song-name">${escapeHtml(item.name_cn)}</td>
+                        <td class="song-name" style="font-weight: 600; color: #1e293b;">${escapeHtml(item.name_cn)}</td>
                         <td style="color: #64748b">${escapeHtml(item.album_name || '单曲/未知')}</td>
                         <td style="color: #64748b">${escapeHtml(item.release_date || '—')}</td>
                         <td>
@@ -194,26 +226,24 @@
                         </td>
                     `;
 
-                    // 歌曲行点击跳转（保留原有逻辑）
+                    // 歌曲行点击跳转（保留原有逻辑，和列表页跳转格式对齐）
                     tr.addEventListener('click', function() {
                         const songId = this.dataset.songId;
                         const type = this.dataset.type;
-                        if (type === 'song') {
-                            window.location.href = `songs-details.html?songId=${encodeURIComponent(songId)}`;
-                        } else {
-                            window.location.href = `single-details.html?singleId=${encodeURIComponent(songId)}`;
-                        }
+                        const resourceId = encodeURIComponent(songId);
+                        const resourceType = encodeURIComponent(type || 'song');
+                        window.location.replace(`./songs-details.html?resourceId=${resourceId}&resourceType=${resourceType}`);
                     });
 
-                    hotSongsListEl.appendChild(tr);
+                    fragment.appendChild(tr);
                 });
+                hotSongsListEl.appendChild(fragment);
 
             } catch (error) {
                 const hotSongsListEl = document.getElementById('hotSongsList');
                 let errorMsg = '网络连接异常';
                 if (error.response) {
                     errorMsg = `服务器错误 (${error.response.status})`;
-                    // 404特殊提示
                     if (error.response.status === 404) {
                         errorMsg = '接口不存在，请检查后端是否启动并配置正确接口';
                     }
@@ -225,37 +255,71 @@
             }
         }
 
-        // 页面加载时执行
-        window.onload = function() {
-            loadHotSongs();
+        // ========== 4. 导航栏登录状态初始化（和列表页完全一致） ==========
+        function initNav() {
+            const token = localStorage.getItem('music_user_token');
+            const loginBtn = document.getElementById('loginBtn');
+            const avatarContainer = document.getElementById('avatarContainer');
+            const navAvatar = document.getElementById('navAvatar');
 
-            // 原有评分逻辑（保留，不修改）
-            document.querySelectorAll('.rating-container').forEach(container => {
-                const scores = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5];
-                const songName = container.dataset.song;
-                let ratingHtml = '';
+            if (!token) {
+                loginBtn.style.display = 'inline-block';
+                avatarContainer.style.display = 'none';
+                return;
+            }
 
-                scores.forEach(score => {
-                    ratingHtml += `
-                        <input type="radio" name="rating-${songName}" id="star-${songName}-${score}" value="${score}">
-                        <label for="star-${songName}-${score}">★</label>
-                    `;
-                });
-                container.innerHTML = ratingHtml;
+            loginBtn.style.display = 'none';
+            avatarContainer.style.display = 'inline-block';
 
-                container.querySelectorAll('input').forEach(input => {
-                    input.addEventListener('change', () => {
-                        const score = input.value;
-                        const scoreDisplay = container.nextElementSibling;
-                        scoreDisplay.textContent = `${score} 星`;
-                    });
-                });
+            fetch('http://127.0.0.1:3000/api/user/info', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            }).then(res => res.json()).then(result => {
+                if (result.code === 200) {
+                    if (result.data.avatar) {
+                        navAvatar.src = result.data.avatar;
+                    } else {
+                        // 默认头像（和列表页一致）
+                        navAvatar.src = `data:image/svg+xml;base64,${btoa(`
+                            <svg width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="18" cy="18" r="18" fill="#3498db"/>
+                            <text x="18" y="22" font-size="16" text-anchor="middle" fill="white">${result.data.username ? result.data.username.charAt(0).toUpperCase() : 'U'}</text>
+                            </svg>
+                        `)}`;
+                    }
+                }
+            }).catch(err => {
+                console.error('获取用户信息失败：', err);
+                localStorage.removeItem('music_user_token');
+                window.location.reload();
             });
+        }
+
+        // ========== 5. 退出登录函数（和列表页完全一致，带确认提示） ==========
+        function logout() {
+            if (confirm('确定退出登录吗？')) {
+                localStorage.removeItem('music_user_token');
+                localStorage.removeItem('userAvatar');
+                localStorage.removeItem('username');
+                window.location.reload();
+            }
+        }
+
+        // ========== 6. 页面初始化（合并原有冲突的window.onload，和列表页对齐） ==========
+        window.onload = function() {
+            // 先初始化导航栏登录状态（和列表页一致）
+            initNav();
+            // 再加载热门歌曲
+            loadHotSongs();
         };
 
-        // 页面返回时刷新数据（新增，和列表页一致）
+        // ========== 7. 页面返回时刷新数据（和列表页一致） ==========
         window.addEventListener('pageshow', (event) => {
-            loadHotSongs();
+            if (event.persisted) {
+                loadHotSongs();
+            }
         });
     </script>
 </body>

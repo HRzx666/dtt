@@ -1,0 +1,236 @@
+我需要先了解您提到的"该功能"具体指什么功能。从之前的对话来看，您提到了评论回复功能，但让我先确认一下您需要接口文档的具体功能范围。
+
+让我查看一下相关的代码文件来了解当前的评论系统实现：
+
+app.js
+让我继续查看评论列表获取接口的实现：
+
+app.js
+基于我对当前代码的分析，我来为您编写一份完整的评论回复功能接口文档。根据您提到的文档要求，我需要确保前后端语义一致，特别是parent_id含义、reply_to语义、replies_total可信度等关键点。
+
+评论回复功能接口文档
+概述
+本接口文档描述了音乐平台评论系统的回复功能实现，支持歌曲、单曲、专辑三种资源的评论和回复功能。
+
+数据模型
+评论模型 (Comment.js)
+
+javascript
+Apply
+{
+  resource_type: String,        // 资源类型: 'song' | 'single' | 'album'
+  resource_id: String,          // 资源ID
+  username: String,             // 评论用户
+  nick_name: String,            // 用户昵称
+  avatar: String,               // 用户头像
+  content: String,              // 评论内容
+  parent_id: {                  // 父评论ID (回复时使用)
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment',
+    default: null
+  },
+  reply_to_user_id: String,     // 回复目标用户ID
+  reply_to_name: String,        // 回复目标用户名
+  likeCount: {                  // 点赞数
+    type: Number,
+    default: 0
+  },
+  createdAt: Date,              // 创建时间
+  updatedAt: Date               // 更新时间
+}
+接口列表
+1. 发布评论
+接口说明: 发布主评论或回复评论
+
+请求方式: POST 接口路径:
+
+歌曲评论: /api/songs/:songId/comments
+单曲评论: /api/singles/:singleId/comments
+专辑评论: /api/albums/:albumId/comments
+请求参数:
+
+参数名	类型	必填	说明
+content	String	是	评论内容(1-500字)
+parent_id	String	否	父评论ID(回复时使用)
+reply_to_user_id	String	否	回复目标用户ID
+reply_to_name	String	否	回复目标用户名
+请求示例:
+
+
+json
+Apply
+{
+  "content": "这首歌很好听！",
+  "parent_id": "67890abcde1234567890abcd",  // 可选，回复评论时使用
+  "reply_to_user_id": "user123",           // 可选，回复目标用户ID
+  "reply_to_name": "张三"                   // 可选，回复目标用户名
+}
+响应数据:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "评论发布成功",
+  "data": {
+    "commentId": "67890abcde1234567890abcd",
+    "resourceId": "song123",
+    "username": "current_user",
+    "nick_name": "当前用户",
+    "avatar": "avatar_url",
+    "content": "这首歌很好听！",
+    "parent_id": null,                     // 主评论为null，回复评论为父评论ID
+    "reply_to_user_id": null,              // 主评论为null，回复评论为目标用户ID
+    "reply_to_name": null,                 // 主评论为null，回复评论为目标用户名
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+}
+2. 获取评论列表
+接口说明: 获取资源的主评论列表，包含回复总数
+
+请求方式: GET 接口路径:
+
+歌曲评论: /api/songs/:songId/comments
+单曲评论: /api/singles/:singleId/comments
+专辑评论: /api/albums/:albumId/comments
+查询参数:
+
+参数名	类型	必填	说明
+page	Number	否	页码(默认1)
+pageSize	Number	否	每页数量(默认20)
+sort	String	否	排序方式: 'NEW'(最新)或'HOT'(热门)
+响应数据:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "获取评论成功",
+  "data": {
+    "comments": [
+      {
+        "_id": "67890abcde1234567890abcd",
+        "username": "user123",
+        "nick_name": "张三",
+        "avatar": "avatar_url",
+        "content": "主评论内容",
+        "createdAt": "2024-01-15T10:30:00Z",
+        "likeCount": 5,
+        "replies_total": 3                    // 回复总数，确保可信
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "pageSize": 20,
+      "total": 150,
+      "totalPages": 8
+    }
+  }
+}
+3. 获取评论回复列表
+接口说明: 获取指定评论的回复列表
+
+请求方式: GET 接口路径: /api/comments/:commentId/replies
+
+查询参数:
+
+参数名	类型	必填	说明
+page	Number	否	页码(默认1)
+pageSize	Number	否	每页数量(默认20)
+响应数据:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "获取回复成功",
+  "data": {
+    "replies": [
+      {
+        "_id": "67890abcde1234567890abcd",
+        "username": "user456",
+        "nick_name": "李四",
+        "avatar": "avatar_url2",
+        "content": "回复内容",
+        "parent_id": "parent_comment_id",     // 父评论ID
+        "reply_to_user_id": "user123",        // 回复目标用户ID
+        "reply_to_name": "张三",               // 回复目标用户名
+        "createdAt": "2024-01-15T11:30:00Z",
+        "likeCount": 2
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "pageSize": 20,
+      "total": 3,
+      "totalPages": 1
+    }
+  }
+}
+4. 评论点赞/取消点赞
+接口说明: 对评论进行点赞或取消点赞操作
+
+请求方式: POST 接口路径: /api/comments/:commentId/like
+
+响应数据:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "点赞成功",
+  "data": {
+    "isLiked": true,
+    "likeCount": 6
+  }
+}
+5. 检查点赞状态
+接口说明: 检查当前用户对评论的点赞状态
+
+请求方式: GET 接口路径: /api/comments/:commentId/like/status
+
+响应数据:
+
+
+json
+Apply
+{
+  "code": 200,
+  "msg": "获取点赞状态成功",
+  "data": {
+    "isLiked": true
+  }
+}
+关键接口约定
+1. parent_id 语义
+主评论: parent_id 必须为 null
+回复评论: parent_id 必须指向有效的父评论ID
+确保父子关系正确，避免循环引用
+2. reply_to 语义
+主评论: reply_to_user_id 和 reply_to_name 为 null
+回复评论: 必须包含被回复用户的ID和名称
+确保回复目标用户信息准确
+3. replies_total 可信度
+只统计直接回复的数量，不包含嵌套回复
+实时计算，确保数据准确
+排序时只对主评论生效，回复按时间顺序排列
+4. 排序规则
+主评论列表: 支持按时间(NEW)或热度(HOT)排序
+回复列表: 固定按时间正序排列(最早回复在前)
+排序字段只作用于主评论，回复保持时间顺序
+错误码说明
+错误码	说明
+400	请求参数错误
+401	未授权访问
+404	资源不存在
+500	服务器内部错误
+注意事项
+评论内容限制: 1-500个字符，支持中英文、数字和常见标点
+权限控制: 发布评论和点赞需要用户登录
+数据一致性: 确保评论与资源的关联关系正确
+性能优化: 评论列表分页查询，避免大数据量传输
+这份接口文档确保了前后端语义的一致性，特别是关键字段的含义和数据处理逻辑，可以有效避免隐蔽bug的产生。

@@ -4,35 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>歌曲列表 - 音乐收藏</title>
+  <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  
   <style>
-    /* 定义现代色彩变量 */
+    /* ========== 列表页专属样式 ========== */
     :root {
-      --primary: #6366f1;         /* 现代靛蓝 */
+      --primary: #6366f1;
       --primary-hover: #4f46e5;
-      --bg-body: #fbfcfd;         /* 极浅灰蓝背景 */
+      --bg-body: #fbfcfd;
       --bg-card: #ffffff;
-      --text-main: #1e293b;       /* 深石板灰 */
-      --text-muted: #64748b;      /* 中性灰 */
-      --border-color: #f1f5f9;    /* 超浅边框 */
-      --accent-orange: #f59e0b;   /* 柔和橙色 */
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #f1f5f9;
+      --accent-orange: #f59e0b;
       --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --nav-height: 60px; /* 导航栏高度，仅用于适配 */
     }
 
     body {
       background-color: var(--bg-body);
       color: var(--text-main);
-      padding: 3rem 1rem;
+      padding: calc(3rem + var(--nav-height)) 1rem 3rem;
       min-height: 100vh;
       display: flex;
       justify-content: center;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
 
     .container {
@@ -46,7 +44,7 @@
     }
 
     h1 {
-      text-align: left; /* 改为左对齐更显高级 */
+      text-align: left;
       font-size: 1.5rem;
       font-weight: 700;
       margin-bottom: 2rem;
@@ -65,7 +63,6 @@
       border-radius: 4px;
     }
 
-    /* 表格样式优化 */
     .table-wrapper {
       overflow-x: auto;
     }
@@ -95,7 +92,6 @@
       transition: all 0.2s ease;
     }
 
-    /* 行悬停效果：略微抬升 */
     .song-item {
       cursor: pointer;
       transition: background-color 0.2s;
@@ -114,7 +110,6 @@
       color: var(--text-main);
     }
 
-    /* 评分标识优化 */
     .score-badge {
       display: inline-flex;
       align-items: center;
@@ -133,7 +128,6 @@
       font-weight: normal;
     }
 
-    /* 分页控件 */
     .pagination {
       margin-top: 2.5rem;
       display: flex;
@@ -175,7 +169,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* 提示状态样式 */
     .tip-row {
       text-align: center;
       padding: 4rem !important;
@@ -183,14 +176,41 @@
       font-style: italic;
     }
 
-    /* 响应式 */
     @media (max-width: 640px) {
-      .container { padding: 1.5rem; }
-      .song-table th:nth-child(3), .song-table td:nth-child(3) { display: none; } /* 移动端隐藏日期 */
+      .container { 
+        padding: 1.5rem; 
+      }
+      .song-table th:nth-child(3), 
+      .song-table td:nth-child(3) { 
+        display: none; 
+      }
+      body { 
+        padding: calc(2rem + var(--nav-height)) 1rem 2rem; 
+      }
     }
   </style>
 </head>
 <body>
+  <!-- 导航栏：结构不变 -->
+  <nav class="nav">
+    <ul>
+      <li><a href="index.html">首页</a></li>
+      <li><a href="about.html">专辑</a></li>
+      <li><a href="songs-list.html">评分</a></li>
+    </ul>
+    <div class="auth-buttons" id="authContainer">
+      <a href="login.html" class="register-btn" id="loginBtn">登录</a>
+      <div class="avatar-container" id="avatarContainer" style="display: none;">
+        <img src="" alt="用户头像" id="navAvatar" class="nav-avatar">
+        <div class="avatar-dropdown">
+          <a href="user-profile.html">个人中心</a>
+          <a href="javascript:logout()" id="logoutLink">退出登录</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 歌曲列表容器 -->
   <div class="container">
     <h1>歌曲列表</h1>
     
@@ -205,7 +225,7 @@
           </tr>
         </thead>
         <tbody id="songList">
-          </tbody>
+        </tbody>
       </table>
     </div>
 
@@ -217,34 +237,33 @@
   </div>
 
   <script>
-    let currentPage = 1;
+    // ========== 1. 核心变量与基础函数 ==========
+    let currentPage = parseInt(sessionStorage.getItem('songListCurrentPage')) || 1;
     let totalPages = 0;
+    // 【新增】存储各页码的滚动位置（sessionStorage持久化，刷新不丢失）
+    let pageScrollPositions = JSON.parse(sessionStorage.getItem('pageScrollPositions')) || {};
+    // 【新增】防止重复恢复滚动的锁
+    let hasRestoredScroll = false;
 
+    // 防XSS转义
     function escapeHtml(str) {
       if (!str) return '';
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 
-    // 核心函数：拉取并渲染列表
+    // ========== 2. 歌曲列表渲染逻辑（原有功能保留 + 新增恢复滚动位置） ==========
     async function renderSongList(page = 1) {
       try {
         const songListEl = document.getElementById('songList');
-        // 显示加载状态，但不清空高度防止抖动
         songListEl.innerHTML = '<tr><td colspan="4" class="tip-row">正在同步最新资源...</td></tr>';
 
-        // 核心改进：添加 _t=Date.now() 强制禁用浏览器缓存，确保返回时拿到的是后端更新后的排序
         const response = await axios.get('http://localhost:3000/api/all-resources/sort-by-rating', {
-          params: { 
-            page: page, 
-            pageSize: 10,
-            _t: Date.now() // 关键：时间戳防止 GET 请求缓存
-          },
+          params: { page, pageSize: 10, _t: Date.now() },
           withCredentials: true,
           timeout: 10000
         });
 
         const result = response.data;
-        
         if (result.code !== 200) {
           songListEl.innerHTML = `<tr><td colspan="4" class="tip-row">同步失败：${escapeHtml(result.msg || '未知错误')}</td></tr>`;
           return;
@@ -253,6 +272,7 @@
         const { resources, pagination } = result.data;
         currentPage = pagination.page;
         totalPages = pagination.totalPages;
+        sessionStorage.setItem('songListCurrentPage', currentPage);
 
         if (!resources || resources.length === 0) {
           songListEl.innerHTML = '<tr><td colspan="4" class="tip-row">暂无相关歌曲数据</td></tr>';
@@ -260,12 +280,10 @@
           return;
         }
 
-        // 清空并渲染
         const fragment = document.createDocumentFragment();
         resources.forEach(item => {
           const tr = document.createElement('tr');
           tr.className = 'song-item';
-          
           tr.innerHTML = `
             <td class="song-name">${escapeHtml(item.name_cn)}</td>
             <td style="color: var(--text-muted)">${escapeHtml(item.album_name || '单曲/未知')}</td>
@@ -276,14 +294,13 @@
             </td>
           `;
 
-          // 跳转逻辑
+          // 跳转详情页
           tr.onclick = () => {
-            const encodedId = encodeURIComponent(item.id);
-            if (item.type === 'song') {
-              window.location.href = `./songs-details.html?songId=${encodedId}`;
-            } else {
-              window.location.href = `./single-details.html?singleId=${encodedId}`;
-            }
+            const resourceId = encodeURIComponent(item.id);
+            const resourceType = encodeURIComponent(item.type || 'song');
+            // 存储当前页（已存在），然后跳转（保持原逻辑）
+            sessionStorage.setItem('songListCurrentPage', currentPage);
+            window.location.replace(`./songs-details.html?resourceId=${resourceId}&resourceType=${resourceType}`);
           };
 
           fragment.appendChild(tr);
@@ -293,16 +310,28 @@
         songListEl.appendChild(fragment);
         updatePagination();
 
+        // 【修改】只在首次渲染当前页时恢复当前页的滚动位置，防止被二次 render 冲掉
+        if (!hasRestoredScroll) {
+          hasRestoredScroll = true;
+          requestAnimationFrame(() => {
+            const scrollTop = pageScrollPositions[currentPage] || 0;
+            window.scrollTo({
+              top: scrollTop,
+              behavior: 'auto' // 无动画，瞬间恢复更自然
+            });
+          });
+        }
+
       } catch (error) {
         console.error('Data fetch error:', error);
         let errorMsg = '网络连接异常';
         if (error.response) errorMsg = `服务器异常 (${error.response.status})`;
         else if (error.request) errorMsg = '无法连接到后端，请检查后端服务';
-        
         document.getElementById('songList').innerHTML = `<tr><td colspan="4" class="tip-row">${escapeHtml(errorMsg)}</td></tr>`;
       }
     }
 
+    // 更新分页
     function updatePagination() {
       const prevBtn = document.getElementById('prevBtn');
       const nextBtn = document.getElementById('nextBtn');
@@ -310,27 +339,111 @@
 
       prevBtn.disabled = currentPage <= 1;
       nextBtn.disabled = currentPage >= totalPages || totalPages === 0;
-
-      pageInfo.textContent = totalPages === 0 
-        ? '0 / 0' 
-        : `第 ${currentPage} 页 / 共 ${totalPages} 页`;
+      pageInfo.textContent = totalPages === 0 ? '0 / 0' : `第 ${currentPage} 页 / 共 ${totalPages} 页`;
     }
 
-    // 分页点击事件
+    // ========== 3. 导航栏登录状态初始化（移植首页完整逻辑） ==========
+    function initNav() {
+      const token = localStorage.getItem('music_user_token'); // 和首页统一token键名
+      const loginBtn = document.getElementById('loginBtn');
+      const avatarContainer = document.getElementById('avatarContainer');
+      const navAvatar = document.getElementById('navAvatar');
+
+      // 未登录状态
+      if (!token) {
+        loginBtn.style.display = 'inline-block';
+        avatarContainer.style.display = 'none';
+        return;
+      }
+
+      // 已登录：隐藏登录按钮，显示头像容器
+      loginBtn.style.display = 'none';
+      avatarContainer.style.display = 'inline-block';
+
+      // 请求用户信息
+      fetch('http://127.0.0.1:3000/api/user/info', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }).then(res => res.json()).then(result => {
+        if (result.code === 200) {
+          // 有用户头像则显示，无则生成默认头像
+          if (result.data.avatar) {
+            navAvatar.src = result.data.avatar;
+          } else {
+            // 生成适配深色导航栏的默认头像（蓝色背景+首字母）
+            navAvatar.src = `data:image/svg+xml;base64,${btoa(`
+              <svg width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="18" cy="18" r="18" fill="#3498db"/>
+                <text x="18" y="22" font-size="16" text-anchor="middle" fill="white">${result.data.username ? result.data.username.charAt(0).toUpperCase() : 'U'}</text>
+              </svg>
+            `)}`;
+          }
+        }
+      }).catch(err => {
+        // token失效：清除token并刷新
+        console.error('获取用户信息失败：', err);
+        localStorage.removeItem('music_user_token');
+        window.location.reload();
+      });
+    }
+
+    // ========== 4. 退出登录函数（和首页一致，加确认提示） ==========
+    function logout() {
+      if (confirm('确定退出登录吗？')) {
+        localStorage.removeItem('music_user_token');
+        localStorage.removeItem('userAvatar');
+        localStorage.removeItem('username');
+        window.location.reload();
+      }
+    }
+
+    // ========== 5. 页面初始化 ========== 
+    window.onload = function() {
+      // 初始化导航栏登录状态
+      initNav();
+      // 渲染歌曲列表
+      renderSongList(currentPage);
+
+      // 【新增】监听滚动事件，实时更新当前页的滚动位置
+      window.addEventListener('scroll', () => {
+        pageScrollPositions[currentPage] = window.scrollY;
+        sessionStorage.setItem('pageScrollPositions', JSON.stringify(pageScrollPositions));
+      });
+    };
+
+    // 【修改】分页点击事件：切换前保存当前页滚动位置并允许下页恢复滚动（重置锁）
     document.getElementById('prevBtn').onclick = () => {
-      if (currentPage > 1) renderSongList(currentPage - 1);
+      if (currentPage > 1) {
+        // 保存当前页滚动位置
+        pageScrollPositions[currentPage] = window.scrollY;
+        sessionStorage.setItem('pageScrollPositions', JSON.stringify(pageScrollPositions));
+
+        hasRestoredScroll = false; // ✅ 允许新页恢复滚动
+        renderSongList(currentPage - 1);
+      }
     };
 
     document.getElementById('nextBtn').onclick = () => {
-      if (currentPage < totalPages) renderSongList(currentPage + 1);
+      if (currentPage < totalPages) {
+        // 保存当前页滚动位置
+        pageScrollPositions[currentPage] = window.scrollY;
+        sessionStorage.setItem('pageScrollPositions', JSON.stringify(pageScrollPositions));
+
+        hasRestoredScroll = false; // ✅ 允许新页恢复滚动
+        renderSongList(currentPage + 1);
+      }
     };
 
-    // 使用 pageshow 监听
-    window.addEventListener('pageshow', (event) => {
-      // 这里的 logic 保证了从详情页“返回”时，无论页面是否来自 bfcache，都执行数据刷新
-      renderSongList(currentPage);
+    // pageshow 只在 bfcache 恢复时重新渲染，否则忽略（避免重复 render）
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) {
+        const savedPage = parseInt(sessionStorage.getItem('songListCurrentPage')) || 1;
+        hasRestoredScroll = false; // bfcache 恢复，允许恢复对应页滚动
+        renderSongList(savedPage);
+      }
     });
-
   </script>
 </body>
 </html>

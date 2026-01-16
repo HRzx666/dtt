@@ -1,0 +1,322 @@
+基础信息
+Base URL: http://localhost:3000
+认证方式: Bearer Token（部分接口需要）
+数据格式: JSON
+1. 获取评论列表接口
+1.1 获取单曲评论列表
+接口地址: GET /api/singles/:singleId/comments
+
+请求参数:
+
+参数名	类型	必填	默认值	说明
+singleId	string	是	-	单曲ID
+page	number	否	1	页码
+pageSize	number	否	20	每页数量
+sortBy	string	否	time	排序字段：time(时间) / like(点赞数)
+order	string	否	desc	排序顺序：desc(降序) / asc(升序)
+请求示例:
+
+
+javascript
+Apply
+// 获取单曲评论（按时间倒序）
+axios.get('/api/singles/123/comments')
+
+// 获取单曲评论（按点赞数降序）
+axios.get('/api/singles/123/comments?sortBy=like&order=desc')
+
+// 获取单曲评论（按时间升序）
+axios.get('/api/singles/123/comments?sortBy=time&order=asc')
+响应示例:
+
+
+javascript
+Apply
+{
+  "code": 200,
+  "data": {
+    "comments": [
+      {
+        "_id": "评论ID",
+        "username": "用户名",
+        "nick_name": "昵称",
+        "avatar": "头像URL",
+        "content": "评论内容",
+        "createdAt": "创建时间",
+        "likeCount": 10,
+        "replies_total": 5
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "pageSize": 20,
+      "total": 100,
+      "totalPages": 5
+    },
+    "sort": {
+      "sortBy": "time",
+      "order": "desc"
+    }
+  },
+  "msg": "获取单曲评论成功"
+}
+1.2 获取专辑评论列表
+接口地址: GET /api/albums/:albumId/comments
+
+请求参数: 同单曲评论列表接口
+
+请求示例:
+
+
+javascript
+Apply
+// 获取专辑评论（按点赞数降序）
+axios.get('/api/albums/456/comments?sortBy=like&order=desc')
+响应格式: 同单曲评论列表接口
+
+2. 获取子评论列表
+接口地址: GET /api/comments/:commentId/replies
+
+请求参数:
+
+参数名	类型	必填	默认值	说明
+commentId	string	是	-	父评论ID
+page	number	否	1	页码
+pageSize	number	否	10	每页数量
+sortBy	string	否	time	排序字段：time(时间) / like(点赞数)
+order	string	否	asc	排序顺序：desc(降序) / asc(升序)
+请求示例:
+
+
+javascript
+Apply
+// 获取子评论（按时间正序）
+axios.get('/api/comments/789/replies')
+
+// 获取子评论（按点赞数降序）
+axios.get('/api/comments/789/replies?sortBy=like&order=desc')
+响应示例:
+
+
+javascript
+Apply
+{
+  "code": 200,
+  "data": {
+    "parentComment": {
+      "_id": "父评论ID",
+      "username": "用户名",
+      "nick_name": "昵称",
+      "content": "评论内容"
+    },
+    "replies": [
+      {
+        "_id": "子评论ID",
+        "username": "用户名",
+        "nick_name": "昵称",
+        "avatar": "头像URL",
+        "content": "回复内容",
+        "createdAt": "创建时间",
+        "likeCount": 3,
+        "parent_id": "父评论ID",
+        "reply_to_user_id": "回复目标用户ID",
+        "reply_to_name": "回复目标用户名"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "pageSize": 10,
+      "total": 25,
+      "totalPages": 3
+    },
+    "sort": {
+      "sortBy": "time",
+      "order": "asc"
+    }
+  },
+  "msg": "获取子评论成功"
+}
+3. 点赞相关接口
+3.1 点赞/取消点赞（需要认证）
+接口地址: POST /api/comments/:commentId/like
+
+请求头:
+
+
+javascript
+Apply
+{
+  "Authorization": "Bearer your_jwt_token"
+}
+请求示例:
+
+
+javascript
+Apply
+// 点赞
+axios.post('/api/comments/789/like', {}, {
+  headers: { 'Authorization': 'Bearer your_token' }
+})
+
+// 取消点赞（同一接口，重复调用会切换状态）
+axios.post('/api/comments/789/like', {}, {
+  headers: { 'Authorization': 'Bearer your_token' }
+})
+响应示例:
+
+
+javascript
+Apply
+// 点赞成功
+{
+  "code": 200,
+  "data": { "isLiked": true },
+  "msg": "点赞成功"
+}
+
+// 取消点赞成功
+{
+  "code": 200,
+  "data": { "isLiked": false },
+  "msg": "取消点赞成功"
+}
+3.2 查询点赞状态（需要认证）
+接口地址: GET /api/comments/:commentId/like/status
+
+请求头: 需要认证头
+
+请求示例:
+
+
+javascript
+Apply
+axios.get('/api/comments/789/like/status', {
+  headers: { 'Authorization': 'Bearer your_token' }
+})
+响应示例:
+
+
+javascript
+Apply
+{
+  "code": 200,
+  "data": { "isLiked": true },
+  "msg": "查询点赞状态成功"
+}
+4. 前端使用示例
+4.1 获取评论列表并支持排序
+
+javascript
+Apply
+// 获取单曲评论，支持排序切换
+async function getSingleComments(singleId, sortBy = 'time', order = 'desc') {
+  try {
+    const response = await axios.get(`/api/singles/${singleId}/comments`, {
+      params: { sortBy, order }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('获取评论失败:', error);
+    throw error;
+  }
+}
+
+// 使用示例
+const comments = await getSingleComments('123', 'like', 'desc');
+4.2 点赞功能完整实现
+
+javascript
+Apply
+class CommentService {
+  constructor(token) {
+    this.token = token;
+  }
+
+  // 点赞/取消点赞
+  async toggleLike(commentId) {
+    const response = await axios.post(`/api/comments/${commentId}/like`, {}, {
+      headers: { 'Authorization': `Bearer ${this.token}` }
+    });
+    return response.data;
+  }
+
+  // 查询点赞状态
+  async getLikeStatus(commentId) {
+    const response = await axios.get(`/api/comments/${commentId}/like/status`, {
+      headers: { 'Authorization': `Bearer ${this.token}` }
+    });
+    return response.data.data.isLiked;
+  }
+
+  // 获取子评论
+  async getReplies(commentId, sortBy = 'time', order = 'asc') {
+    const response = await axios.get(`/api/comments/${commentId}/replies`, {
+      params: { sortBy, order }
+    });
+    return response.data;
+  }
+}
+
+// 使用示例
+const commentService = new CommentService('your_jwt_token');
+await commentService.toggleLike('789');
+const isLiked = await commentService.getLikeStatus('789');
+4.3 评论排序功能
+
+javascript
+Apply
+// 排序选项配置
+const SORT_OPTIONS = {
+  time_desc: { sortBy: 'time', order: 'desc', label: '最新评论' },
+  time_asc: { sortBy: 'time', order: 'asc', label: '最早评论' },
+  like_desc: { sortBy: 'like', order: 'desc', label: '热门评论' },
+  like_asc: { sortBy: 'like', order: 'asc', label: '冷门评论' }
+};
+
+// 渲染排序选择器
+function renderSortSelector(currentSort, onSortChange) {
+  return `
+    <select onchange="onSortChange(this.value)">
+      ${Object.entries(SORT_OPTIONS).map(([key, option]) => 
+        `<option value="${key}" ${currentSort === key ? 'selected' : ''}>
+          ${option.label}
+        </option>`
+      ).join('')}
+    </select>
+  `;
+}
+5. 错误处理
+5.1 常见错误码
+200: 成功
+400: 请求参数错误
+401: 未认证（需要登录）
+404: 资源不存在
+500: 服务器内部错误
+5.2 错误处理示例
+
+javascript
+Apply
+async function handleApiCall(apiCall) {
+  try {
+    return await apiCall();
+  } catch (error) {
+    if (error.response?.status === 401) {
+      // 跳转到登录页面
+      window.location.href = '/login';
+    } else if (error.response?.status === 404) {
+      // 显示资源不存在提示
+      alert('评论不存在');
+    } else {
+      // 显示通用错误提示
+      alert('操作失败，请重试');
+    }
+    throw error;
+  }
+}
+6. 最佳实践
+缓存策略: 对评论列表进行适当缓存，避免频繁请求
+分页加载: 使用分页参数控制数据量，提升性能
+错误重试: 对网络错误实现重试机制
+加载状态: 显示加载状态，提升用户体验
+实时更新: 点赞后及时更新UI状态
+这份文档涵盖了所有评论相关的接口调用方式，前端开发者可以根据这份文档快速集成评论功能。
