@@ -298,7 +298,7 @@ app.get('/api/albums/:albumId/songs/sort-by-rating', async (req, res, next) => {
       return {
         ...song._doc,
         averageScore: rating ? parseFloat(rating.averageScore.toFixed(1)) : 0,
-        ratingCount: rating ? rating.ratingCount : 0
+ratingCount: rating ? rating.ratingCount : 0
       };
     }).sort((a, b) => {
       if (b.averageScore !== a.averageScore) return b.averageScore - a.averageScore;
@@ -407,6 +407,150 @@ app.get('/api/songs/sort-by-rating', async (req, res, next) => {
 
   } catch (err) {
     console.error(`[${getNow()}] ❌ 全量歌曲评分排序接口错误：`, err.stack);
+    next(err);
+  }
+});
+
+// 歌曲搜索接口
+app.get('/api/songs/search', async (req, res, next) => {
+  try {
+    const { keyword, page = 1, pageSize = 20, targetSongId } = req.query;
+    const skip = (page - 1) * pageSize;
+
+    console.log(`[${getNow()}] 🔍 搜索歌曲 - 关键词：${keyword} | 页码：${page} | 页大小：${pageSize} | 目标歌曲ID：${targetSongId}`);
+
+    // 1. 校验搜索关键词
+    if (!keyword || keyword.trim().length === 0) {
+      throw new AppError('搜索关键词不能为空', 400);
+    }
+    const searchKeyword = keyword.trim();
+
+    // 2. 构建宽松的搜索条件（支持歌曲名称和专辑名称的模糊匹配）
+    // 将关键词拆分为单个字符，使用OR条件匹配其中任意一个字符
+    const keywordChars = searchKeyword.split('');
+    const fuzzySearchConditions = keywordChars.map(char => ({
+      $or: [
+        { name_cn: { $regex: char, $options: 'i' } },
+        { name_en: { $regex: char, $options: 'i' } }
+      ]
+    }));
+
+    const searchCondition = {
+      $or: fuzzySearchConditions
+    };
+
+    // 3. 搜索数据库中的专辑歌曲
+    const songsWithAlbum = await Song.aggregate([
+      { $match: searchCondition },
+      {
+        $lookup: {
+          from: 'albums',
+          localField: 'album_id',
+          foreignField: 'id',
+          as: 'albumInfo'
+        }
+      },
+      { $unwind: { path: '$albumInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          id: 1,
+          name_cn: 1,
+          name_en: 1,
+          album_id: 1,
+          album_name: { $ifNull: ['$albumInfo.name_cn', '未知专辑'] },
+          album_cover: { $ifNull: ['$albumInfo.cover_url', ''] },
+          release_date: { $ifNull: ['$albumInfo.release_date', '未知时间'] },
+          lyricist: 1,
+          composer: 1,
+          arranger: 1,
+          duration: 1
+        }
+      }
+    ]);
+
+    // 4. 搜索静态单曲数据（宽松匹配：只要有一个字符匹配就返回）
+    const matchingSingles = taoZheSingles.filter(single => {
+      const name = (single.name_cn || '') + (single.name_en || '');
+      return keywordChars.some(char => name.includes(char));
+    }).map(single => ({
+      id: single.id,
+      name_cn: single.name_cn,
+      name_en: single.name_en || '',
+      album_id: null,
+      album_name: '单曲',
+      album_cover: '',
+      release_date: single.release_date,
+      lyricist: '',
+      composer: '陶喆',
+      arranger: '',
+      duration: '',
+      description: single.description
+    }));
+
+    // 5. 合并搜索结果并统一排序
+    const allResults = [...songsWithAlbum, ...matchingSingles].sort((a, b) => 
+      a.name_cn.localeCompare(b.name_cn, 'zh-CN')
+    );
+
+    // 6. 计算总数量
+    const total = allResults.length;
+
+    // 7. 获取完整的歌曲ID列表（用于计算目标歌曲位置）
+    let targetSongPosition = null;
+    if (targetSongId) {
+      const allSongIds = allResults.map(item => item.id);
+      const index = allSongIds.indexOf(targetSongId);
+      
+      if (index !== -1) {
+        targetSongPosition = {
+          index: index + 1, // 从1开始计数
+          page: Math.ceil((index + 1) / pageSize)
+        };
+      }
+    }
+
+    // 8. 分页处理
+    const paginatedResults = allResults.slice(skip, skip + Number(pageSize));
+
+    // 9. 如果有搜索结果，获取评分信息
+    let resultsWithRatings = paginatedResults;
+    if (paginatedResults.length > 0) {
+      const songIds = paginatedResults.map(item => item.id);
+      const ratingAgg = await Rating.aggregate([
+        { $match: { resource_type: 'song', resource_id: { $in: songIds } } },
+        { $group: { _id: '$resource_id', averageScore: { $avg: '$score' }, ratingCount: { $sum: 1 } } }
+      ]);
+
+      // 整合评分信息
+      resultsWithRatings = paginatedResults.map(item => {
+        const rating = ratingAgg.find(r => r._id === item.id);
+        return {
+          ...item,
+          averageScore: rating ? parseFloat(rating.averageScore.toFixed(1)) : 0,
+          ratingCount: rating ? rating.ratingCount : 0
+        };
+      });
+    }
+
+    console.log(`[${getNow()}] ✅ 搜索歌曲成功 - 关键词：${searchKeyword} | 结果数：${resultsWithRatings.length} | 总数量：${total}`);
+
+    res.json({
+      code: 200,
+      data: {
+        songs: resultsWithRatings,
+        pagination: {
+          page: Number(page),
+          pageSize: Number(pageSize),
+          total,
+          totalPages: Math.ceil(total / pageSize)
+        },
+        ...(targetSongPosition && { targetSongPosition }) // 仅当有目标歌曲位置时返回
+      },
+      msg: '搜索歌曲成功'
+    });
+  } catch (err) {
+    console.error(`[${getNow()}] ❌ 搜索歌曲失败：`, err.message);
     next(err);
   }
 });

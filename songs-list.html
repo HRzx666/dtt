@@ -20,6 +20,8 @@
       --accent-orange: #f59e0b;
       --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
       --nav-height: 60px; /* 导航栏高度，仅用于适配 */
+      --highlight-color: rgba(99, 102, 241, 0.1); /* 歌曲高亮背景色 */
+      --highlight-border: 1px solid #6366f1; /* 歌曲高亮边框 */
     }
 
     body {
@@ -63,6 +65,89 @@
       border-radius: 4px;
     }
 
+    /* 新增：搜索框样式 */
+    .search-box {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 0.8rem;
+      width: 100%;
+      max-width: 500px;
+    }
+    .search-input {
+      flex: 1;
+      padding: 0.8rem 1.2rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    .search-btn {
+      padding: 0.8rem 1.5rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .search-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    /* ========== 新增：搜索历史记录样式 - 核心需求 ========== */
+    .search-history {
+      width: 100%;
+      max-width: 500px;
+      margin-bottom: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .history-title {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+    .history-item {
+      padding: 4px 12px;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .history-item:hover {
+      background: var(--highlight-color);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    .clear-history {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      margin-left: auto;
+      transition: color 0.2s;
+    }
+    .clear-history:hover {
+      color: var(--primary);
+    }
+    .history-empty {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
     .table-wrapper {
       overflow-x: auto;
     }
@@ -95,6 +180,7 @@
     .song-item {
       cursor: pointer;
       transition: background-color 0.2s;
+      border-radius: 8px;
     }
 
     .song-item:hover {
@@ -103,6 +189,18 @@
 
     .song-item:hover td {
       color: var(--primary);
+    }
+
+    /* 高亮歌曲样式 */
+    .song-item.highlight {
+      background-color: var(--highlight-color);
+      border: var(--highlight-border);
+      border-left: none;
+      border-right: none;
+    }
+    .song-item.highlight td {
+      color: var(--primary);
+      font-weight: 600;
     }
 
     .song-name {
@@ -187,6 +285,9 @@
       body { 
         padding: calc(2rem + var(--nav-height)) 1rem 2rem; 
       }
+      .search-box, .search-history {
+        max-width: 100%;
+      }
     }
   </style>
 </head>
@@ -203,7 +304,7 @@
       <div class="avatar-container" id="avatarContainer" style="display: none;">
         <img src="" alt="用户头像" id="navAvatar" class="nav-avatar">
         <div class="avatar-dropdown">
-          <a href="user-profile.html">个人中心</a>
+          <a href="user-profile.html">个⼈中心</a>
           <a href="javascript:logout()" id="logoutLink">退出登录</a>
         </div>
       </div>
@@ -214,6 +315,15 @@
   <div class="container">
     <h1>歌曲列表</h1>
     
+    <!-- ========== 搜索框 DOM ========== -->
+    <div class="search-box">
+      <input type="text" class="search-input" id="searchKeyword" placeholder="输入歌曲名搜索...">
+      <button class="search-btn" id="searchBtn">搜索歌曲</button>
+    </div>
+
+    <!-- ========== 核心新增：搜索历史记录容器 ========== -->
+    <div class="search-history" id="searchHistory"></div>
+
     <div class="table-wrapper">
       <table class="song-table">
         <thead>
@@ -240,10 +350,14 @@
     // ========== 1. 核心变量与基础函数 ==========
     let currentPage = parseInt(sessionStorage.getItem('songListCurrentPage')) || 1;
     let totalPages = 0;
-    // 【新增】存储各页码的滚动位置（sessionStorage持久化，刷新不丢失）
     let pageScrollPositions = JSON.parse(sessionStorage.getItem('pageScrollPositions')) || {};
-    // 【新增】防止重复恢复滚动的锁
     let hasRestoredScroll = false;
+    // 搜索相关核心变量
+    let isSearchMode = false; 
+    let searchKeyword = '';    
+    let targetSongId = '';    
+    // 新增：搜索历史配置 - 最多保存10条
+    const MAX_HISTORY = 10;
 
     // 防XSS转义
     function escapeHtml(str) {
@@ -251,8 +365,60 @@
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 
-    // ========== 2. 歌曲列表渲染逻辑（原有功能保留 + 新增恢复滚动位置） ==========
+    // ========== 新增：搜索历史 核心方法 【重中之重】 ==========
+    // 1. 获取本地存储的搜索历史
+    function getSearchHistory() {
+      const history = localStorage.getItem('songSearchHistory');
+      return history ? JSON.parse(history) : [];
+    }
+    // 2. 保存搜索关键词到历史（自动去重、最多10条）
+    function saveSearchHistory(keyword) {
+      if (!keyword.trim()) return;
+      let history = getSearchHistory();
+      // 去重：如果已有该关键词，先删除再添加到最前面
+      history = history.filter(item => item !== keyword.trim());
+      // 新增到头部
+      history.unshift(keyword.trim());
+      // 只保留最多10条
+      if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+      // 存入本地
+      localStorage.setItem('songSearchHistory', JSON.stringify(history));
+      // 刷新历史展示
+      renderSearchHistory();
+    }
+    // 3. 渲染搜索历史到页面
+    function renderSearchHistory() {
+      const historyEl = document.getElementById('searchHistory');
+      const history = getSearchHistory();
+      if (history.length === 0) {
+        historyEl.innerHTML = '<span class="history-empty">暂无搜索历史</span>';
+        return;
+      }
+      let html = '<span class="history-title">搜索历史：</span>';
+      history.forEach(item => {
+        html += `<span class="history-item">${escapeHtml(item)}</span>`;
+      });
+      html += '<span class="clear-history">清空历史</span>';
+      historyEl.innerHTML = html;
+
+      // 绑定历史项点击事件：回填关键词+搜索
+      document.querySelectorAll('.history-item').forEach(item => {
+        item.onclick = () => {
+          const keyword = item.textContent.trim();
+          document.getElementById('searchKeyword').value = keyword;
+          searchAndJumpToSong(keyword, '');
+        }
+      });
+      // 绑定清空历史事件
+      document.querySelector('.clear-history').onclick = () => {
+        localStorage.removeItem('songSearchHistory');
+        renderSearchHistory();
+      }
+    }
+
+    // ========== 2. 原有：默认按评分排序的歌曲列表渲染 ==========
     async function renderSongList(page = 1) {
+      isSearchMode = false; 
       try {
         const songListEl = document.getElementById('songList');
         songListEl.innerHTML = '<tr><td colspan="4" class="tip-row">正在同步最新资源...</td></tr>';
@@ -274,61 +440,167 @@
         totalPages = pagination.totalPages;
         sessionStorage.setItem('songListCurrentPage', currentPage);
 
-        if (!resources || resources.length === 0) {
-          songListEl.innerHTML = '<tr><td colspan="4" class="tip-row">暂无相关歌曲数据</td></tr>';
+        renderTableData(resources, pagination);
+      } catch (error) {
+        handleRequestError(error);
+      }
+    }
+
+    // ========== 核心：搜索并跳转歌曲函数 ==========
+    async function searchAndJumpToSong(keyword, songId) {
+      if (!keyword.trim()) {
+        alert('请输入搜索关键词');
+        return;
+      }
+      // 保存搜索关键词到历史
+      saveSearchHistory(keyword);
+      
+      searchKeyword = keyword.trim();
+      targetSongId = songId;
+      isSearchMode = true;
+      hasRestoredScroll = false;
+
+      const songListEl = document.getElementById('songList');
+      songListEl.innerHTML = '<tr><td colspan="4" class="tip-row">正在搜索歌曲...</td></tr>';
+
+      try {
+        let params = {
+          keyword: searchKeyword,
+          pageSize: 10, // ✅ 固定每页10条搜索结果，核心配置
+          _t: Date.now()
+        }
+        if(targetSongId) params.targetSongId = targetSongId;
+        
+        const response = await axios.get('http://localhost:3000/api/songs/search', {
+          params: params,
+          withCredentials: true,
+          timeout: 10000
+        });
+
+        const data = response.data;
+        if (data.code === 200) {
+          let targetPage = 1;
+          if(data.data.targetSongPosition){
+              targetPage = data.data.targetSongPosition.page;
+          }
+          await loadSearchResults(targetPage);
+          setTimeout(() => {
+            highlightTargetSong(targetSongId);
+          }, 100);
+        } else {
+          songListEl.innerHTML = `<tr><td colspan="4" class="tip-row">${escapeHtml(data.msg || '未找到该歌曲')}</td></tr>`;
           updatePagination();
+        }
+      } catch (error) {
+        handleRequestError(error);
+      }
+    }
+
+    // ========== 加载搜索结果列表 ==========
+    async function loadSearchResults(page = 1) {
+      try {
+        const songListEl = document.getElementById('songList');
+        songListEl.innerHTML = '<tr><td colspan="4" class="tip-row">正在加载搜索结果...</td></tr>';
+
+        const response = await axios.get('http://localhost:3000/api/songs/search', {
+          params: {
+            keyword: searchKeyword,
+            page: page,
+            pageSize: 10, // ✅ 强制每页10条，不会变1条
+            _t: Date.now()
+          },
+          withCredentials: true,
+          timeout: 10000
+        });
+
+        const result = response.data;
+        if (result.code !== 200) {
+          songListEl.innerHTML = `<tr><td colspan="4" class="tip-row">搜索失败：${escapeHtml(result.msg || '未知错误')}</td></tr>`;
           return;
         }
 
-        const fragment = document.createDocumentFragment();
-        resources.forEach(item => {
-          const tr = document.createElement('tr');
-          tr.className = 'song-item';
-          tr.innerHTML = `
-            <td class="song-name">${escapeHtml(item.name_cn)}</td>
-            <td style="color: var(--text-muted)">${escapeHtml(item.album_name || '单曲/未知')}</td>
-            <td style="color: var(--text-muted)">${escapeHtml(item.release_date || '—')}</td>
-            <td>
-              <span class="score-badge">${item.averageScore || '0.0'}</span>
-              <span class="rating-count">${item.ratingCount || 0} 评分</span>
-            </td>
-          `;
+        const { songs, pagination } = result.data;
+        currentPage = pagination.page;
+        totalPages = pagination.totalPages;
+        sessionStorage.setItem('songListCurrentPage', currentPage);
 
-          // 跳转详情页
-          tr.onclick = () => {
-            const resourceId = encodeURIComponent(item.id);
-            const resourceType = encodeURIComponent(item.type || 'song');
-            // 存储当前页（已存在），然后跳转（保持原逻辑）
-            sessionStorage.setItem('songListCurrentPage', currentPage);
-            window.location.replace(`./songs-details.html?resourceId=${resourceId}&resourceType=${resourceType}`);
-          };
+        renderTableData(songs, pagination);
 
-          fragment.appendChild(tr);
-        });
-
-        songListEl.innerHTML = '';
-        songListEl.appendChild(fragment);
-        updatePagination();
-
-        // 【修改】只在首次渲染当前页时恢复当前页的滚动位置，防止被二次 render 冲掉
         if (!hasRestoredScroll) {
           hasRestoredScroll = true;
           requestAnimationFrame(() => {
             const scrollTop = pageScrollPositions[currentPage] || 0;
-            window.scrollTo({
-              top: scrollTop,
-              behavior: 'auto' // 无动画，瞬间恢复更自然
-            });
+            window.scrollTo({ top: scrollTop, behavior: 'auto' });
           });
         }
-
       } catch (error) {
-        console.error('Data fetch error:', error);
-        let errorMsg = '网络连接异常';
-        if (error.response) errorMsg = `服务器异常 (${error.response.status})`;
-        else if (error.request) errorMsg = '无法连接到后端，请检查后端服务';
-        document.getElementById('songList').innerHTML = `<tr><td colspan="4" class="tip-row">${escapeHtml(errorMsg)}</td></tr>`;
+        handleRequestError(error);
       }
+    }
+
+    // ========== 高亮目标歌曲 + 滚动到可视区域 ==========
+    function highlightTargetSong(songId) {
+      if (!songId) return;
+      document.querySelectorAll('.song-item.highlight').forEach(el => {
+        el.classList.remove('highlight');
+      });
+      const targetItem = document.querySelector(`.song-item[data-id="${songId}"]`);
+      if (targetItem) {
+        targetItem.classList.add('highlight');
+        targetItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => {
+          targetItem.classList.remove('highlight');
+        }, 3000);
+      }
+    }
+
+    // ========== 公共：表格数据渲染封装 ==========
+    function renderTableData(dataList, pagination) {
+      const songListEl = document.getElementById('songList');
+      if (!dataList || dataList.length === 0) {
+        songListEl.innerHTML = '<tr><td colspan="4" class="tip-row">暂无相关歌曲数据</td></tr>';
+        updatePagination();
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      dataList.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'song-item';
+        tr.dataset.id = item.id;
+        tr.innerHTML = `
+          <td class="song-name">${escapeHtml(item.name_cn)}</td>
+          <td style="color: var(--text-muted)">${escapeHtml(item.album_name || '单曲/未知')}</td>
+          <td style="color: var(--text-muted)">${escapeHtml(item.release_date || '—')}</td>
+          <td>
+            <span class="score-badge">${item.averageScore || '0.0'}</span>
+            <span class="rating-count">${item.ratingCount || 0} 评分</span>
+          </td>
+        `;
+
+        tr.onclick = () => {
+          searchAndJumpToSong(item.name_cn, item.id);
+          const resourceId = encodeURIComponent(item.id);
+          const resourceType = encodeURIComponent(item.type || 'song');
+          sessionStorage.setItem('songListCurrentPage', currentPage);
+          window.location.replace(`./songs-details.html?resourceId=${resourceId}&resourceType=${resourceType}`);
+        };
+
+        fragment.appendChild(tr);
+      });
+
+      songListEl.innerHTML = '';
+      songListEl.appendChild(fragment);
+      updatePagination();
+    }
+
+    // ========== 公共：请求错误统一处理 ==========
+    function handleRequestError(error) {
+      console.error('Data fetch error:', error);
+      let errorMsg = '网络连接异常';
+      if (error.response) errorMsg = `服务器异常 (${error.response.status})`;
+      else if (error.request) errorMsg = '无法连接到后端，请检查后端服务';
+      document.getElementById('songList').innerHTML = `<tr><td colspan="4" class="tip-row">${escapeHtml(errorMsg)}</td></tr>`;
     }
 
     // 更新分页
@@ -342,25 +614,22 @@
       pageInfo.textContent = totalPages === 0 ? '0 / 0' : `第 ${currentPage} 页 / 共 ${totalPages} 页`;
     }
 
-    // ========== 3. 导航栏登录状态初始化（移植首页完整逻辑） ==========
+    // ========== 导航栏登录状态初始化 ==========
     function initNav() {
-      const token = localStorage.getItem('music_user_token'); // 和首页统一token键名
+      const token = localStorage.getItem('music_user_token');
       const loginBtn = document.getElementById('loginBtn');
       const avatarContainer = document.getElementById('avatarContainer');
       const navAvatar = document.getElementById('navAvatar');
 
-      // 未登录状态
       if (!token) {
         loginBtn.style.display = 'inline-block';
         avatarContainer.style.display = 'none';
         return;
       }
 
-      // 已登录：隐藏登录按钮，显示头像容器
       loginBtn.style.display = 'none';
       avatarContainer.style.display = 'inline-block';
 
-      // 请求用户信息
       fetch('http://127.0.0.1:3000/api/user/info', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -368,11 +637,9 @@
         }
       }).then(res => res.json()).then(result => {
         if (result.code === 200) {
-          // 有用户头像则显示，无则生成默认头像
           if (result.data.avatar) {
             navAvatar.src = result.data.avatar;
           } else {
-            // 生成适配深色导航栏的默认头像（蓝色背景+首字母）
             navAvatar.src = `data:image/svg+xml;base64,${btoa(`
               <svg width="36" height="36" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="18" cy="18" r="18" fill="#3498db"/>
@@ -382,14 +649,13 @@
           }
         }
       }).catch(err => {
-        // token失效：清除token并刷新
         console.error('获取用户信息失败：', err);
         localStorage.removeItem('music_user_token');
         window.location.reload();
       });
     }
 
-    // ========== 4. 退出登录函数（和首页一致，加确认提示） ==========
+    // ========== 退出登录函数 ==========
     function logout() {
       if (confirm('确定退出登录吗？')) {
         localStorage.removeItem('music_user_token');
@@ -399,49 +665,59 @@
       }
     }
 
-    // ========== 5. 页面初始化 ========== 
+    // ========== 5. 页面初始化 + 事件绑定 ========== 
     window.onload = function() {
-      // 初始化导航栏登录状态
       initNav();
-      // 渲染歌曲列表
       renderSongList(currentPage);
+      renderSearchHistory(); // 初始化渲染搜索历史
 
-      // 【新增】监听滚动事件，实时更新当前页的滚动位置
+      // 监听滚动事件，保存滚动位置
       window.addEventListener('scroll', () => {
         pageScrollPositions[currentPage] = window.scrollY;
         sessionStorage.setItem('pageScrollPositions', JSON.stringify(pageScrollPositions));
       });
+
+      // 搜索按钮点击事件
+      document.getElementById('searchBtn').addEventListener('click', () => {
+        const keyword = document.getElementById('searchKeyword').value;
+        searchAndJumpToSong(keyword, '');
+      });
+
+      // 搜索框回车事件
+      document.getElementById('searchKeyword').addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') {
+          const keyword = e.target.value;
+          searchAndJumpToSong(keyword, '');
+        }
+      });
     };
 
-    // 【修改】分页点击事件：切换前保存当前页滚动位置并允许下页恢复滚动（重置锁）
+    // ========== ✅ 致命BUG修复：下一页按钮的减1 改为 加1 ==========
     document.getElementById('prevBtn').onclick = () => {
       if (currentPage > 1) {
-        // 保存当前页滚动位置
         pageScrollPositions[currentPage] = window.scrollY;
         sessionStorage.setItem('pageScrollPositions', JSON.stringify(pageScrollPositions));
-
-        hasRestoredScroll = false; // ✅ 允许新页恢复滚动
-        renderSongList(currentPage - 1);
+        hasRestoredScroll = false;
+        isSearchMode ? loadSearchResults(currentPage - 1) : renderSongList(currentPage - 1);
       }
     };
 
     document.getElementById('nextBtn').onclick = () => {
       if (currentPage < totalPages) {
-        // 保存当前页滚动位置
         pageScrollPositions[currentPage] = window.scrollY;
         sessionStorage.setItem('pageScrollPositions', JSON.stringify(pageScrollPositions));
-
-        hasRestoredScroll = false; // ✅ 允许新页恢复滚动
-        renderSongList(currentPage + 1);
+        hasRestoredScroll = false;
+        // ✅ 修复：renderSongList(currentPage - 1) → renderSongList(currentPage + 1)
+        isSearchMode ? loadSearchResults(currentPage + 1) : renderSongList(currentPage + 1);
       }
     };
 
-    // pageshow 只在 bfcache 恢复时重新渲染，否则忽略（避免重复 render）
+    // pageshow 兼容bfcache
     window.addEventListener('pageshow', (e) => {
       if (e.persisted) {
         const savedPage = parseInt(sessionStorage.getItem('songListCurrentPage')) || 1;
-        hasRestoredScroll = false; // bfcache 恢复，允许恢复对应页滚动
-        renderSongList(savedPage);
+        hasRestoredScroll = false;
+        isSearchMode ? loadSearchResults(savedPage) : renderSongList(savedPage);
       }
     });
   </script>

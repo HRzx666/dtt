@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>歌曲详情与评论</title>
   <style>
-    /* ========== 全局变量定义 ========== */
+     /* ========== 全局变量定义 ========== */
     :root {
       --primary: #6366f1;         /* 主色：现代靛蓝 */
       --primary-hover: #4f46e5;   /* 主色hover */
@@ -36,6 +36,93 @@
       min-height: 100vh;
       display: flex;
       justify-content: center;
+    }
+
+    /* 回复相关按钮样式 */
+    .reply-toggle-btn {
+      background: rgba(99, 102, 241, 0.08);
+      color: var(--primary);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-right: 8px;
+    }
+
+    .reply-toggle-btn:hover {
+      background: rgba(99, 102, 241, 0.12);
+      border-color: rgba(99, 102, 241, 0.3);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(99, 102, 241, 0.1);
+    }
+
+    .reply-toggle-btn:active {
+      transform: translateY(0);
+    }
+
+    .load-more-replies-btn {
+      background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin: 8px 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .load-more-replies-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, var(--primary-hover) 0%, #7c3aed 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .load-more-replies-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .load-more-replies-btn::after {
+      content: "↓";
+      font-size: 0.9em;
+      transition: transform 0.2s ease;
+    }
+
+    .load-more-replies-btn:hover::after {
+      transform: translateY(1px);
+    }
+
+    .delete-btn {
+      background: rgba(239, 68, 68, 0.08);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-left: auto;
+    }
+
+    .delete-btn:hover {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.3);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
+    }
+
+    .delete-btn:active {
+      transform: translateY(0);
     }
 
     /* ========== 容器样式 ========== */
@@ -203,7 +290,7 @@
       background: var(--primary);
       color: white;
       border: none;
-      padding: 8px 20px;
+	padding: 8px 20px;
       border-radius: 8px;
       font-weight: 600;
       font-size: 0.875rem;
@@ -303,7 +390,7 @@
 
     .comment-input:focus {
       outline: none;
-	border-color: var(--primary);
+	  border-color: var(--primary);
       box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
     }
 
@@ -634,7 +721,7 @@
       display: flex;
       align-items: center;
       gap: 16px;
-      marginTop: 0.75rem;
+      margin-top: 0.75rem;
       padding-top: 0.75rem;
       border-top: 1px solid var(--border-color);
     }
@@ -1556,9 +1643,9 @@ function toggleRepliesList(toggleBtn, repliesList, replyCount) {
   console.log(`【回复功能】【列表切换】 回复列表状态=${isShow ? '展开' : '折叠'}, 回复总数=${replyCount}`);
   // 更新按钮文本
   if (isShow) {
-    toggleBtn.innerHTML = `<span>📥</span><span>收起回复(${replyCount})</span>`;
+    toggleBtn.innerHTML = `<span>收起回复(${replyCount})</span>`;
   } else {
-    toggleBtn.innerHTML = `<span>📤</span><span>展开回复(${replyCount})</span>`;
+    toggleBtn.innerHTML = `<span>展开回复(${replyCount})</span>`;
   }
 }
 
@@ -1690,7 +1777,7 @@ async function handleReplySubmit(commentId, replyForm) {
     const currentCount = parseInt(toggleBtn.dataset.replyCount || '0', 10);
     toggleBtn.dataset.replyCount = currentCount + 1;
     // 🔥 修改：回复后保持展开状态，不自动变成收起状态
-    toggleBtn.innerHTML = `<span>📤</span><span>展开回复(${currentCount + 1})</span>`;
+    toggleBtn.innerHTML = `<span>展开回复(${currentCount + 1})</span>`;
     console.log(`【回复功能】【提交回复】 更新回复数量，原数量=${currentCount}，新数量=${currentCount+1}`);
   }
 
@@ -1734,6 +1821,11 @@ async function handleReplySubmit(commentId, replyForm) {
           likeBtn.dataset.replyId = a;
           likeBtn.dataset.parentId = realParentId;
         }
+        const deleteBtn = tempReplyEl.querySelector(`.delete-btn[data-reply-id="${tempReplyId}"]`);
+        if (deleteBtn) {
+          deleteBtn.dataset.replyId = a;
+          deleteBtn.dataset.parentId = realParentId;
+        }
         tempReplyEl.classList.remove('temp-reply');
         tempReplyEl.setAttribute('data-parent-comment-id', realParentId);
         console.log(`【回复功能】【提交回复】 临时回复ID替换完成，更新为真实ID=${realReplyId}`);
@@ -1755,7 +1847,7 @@ async function handleReplySubmit(commentId, replyForm) {
       const currentCount = parseInt(toggleBtn.dataset.replyCount || '1', 10);
       const newCount = Math.max(0, currentCount - 1);
       toggleBtn.dataset.replyCount = newCount;
-      toggleBtn.innerHTML = newCount > 0 ? `<span>📤</span><span>展开回复(${newCount})</span>` : `<span>📤</span><span>展开回复</span>`;
+      toggleBtn.innerHTML = newCount > 0 ? `<span>展开回复(${newCount})</span>` : `<span>展开回复</span>`;
       console.log(`【回复功能】【提交回复】 回滚回复数量，原数量=${currentCount}，新数量=${newCount}`);
     }
 
@@ -1870,6 +1962,7 @@ async function like() {
       </button>
       <button class="reply-btn reply-to-reply-btn" data-reply-id="${reply._id}" data-parent-id="${reply.parent_id}" data-reply-to="${userName}">
         <span>💬</span><span>回复</span>
+        
       </button>
     </div>
   </div>
@@ -1886,6 +1979,36 @@ replyItem.insertBefore(avatarDiv, replyItem.firstChild);
     container.appendChild(replyItem);
   }
 
+  let user = getUserFromCache();
+if (!user) {
+    user = await getCurrentUserInfo();
+    if (!user) {
+        // 用户信息失效，需要重新登录
+        localStorage.removeItem('music_user_token');
+        clearUserCache();
+        // 跳转到登录页
+    }
+}
+  //绑定删除按钮事件
+const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'delete-btn';
+  deleteBtn.textContent = '删除';
+  deleteBtn.setAttribute('data-reply-id', reply._id);
+  const actions = replyItem.querySelector('.reply-actions');
+  if(reply.username ===  user.username){
+    actions.appendChild(deleteBtn);
+  }
+ deleteBtn.addEventListener('click', async () => {
+  try {
+    replyItem.remove();
+     deleteComment(deleteBtn.dataset.replyId);
+    // 更新分页
+    renderCommentsPagination();
+  } catch (error) {
+    console.error('删除评论失败:', error);
+    showErrorToast('删除评论失败，请稍后重试');
+  }
+});
   // ========== 绑定回复的点赞事件 ==========
   const likeBtn = replyItem.querySelector(`.like-btn[data-reply-id="${reply._id}"]`);
   const heartIcon = replyItem.querySelector('.heart-icon');
@@ -1953,12 +2076,9 @@ const reqParams = {
     
 
     const { comments, pagination } = res.data.data;
+    console.log(res.data.data);
     console.log(`【评论列表】【加载列表】 原始评论数据共${comments.length}条=`, comments);
     
-    document.getElementById("commentsTotalCount").textContent = `${pagination.total || 0} 条评论`;
-    totalCommentPages = pagination.totalPages || 0;
-    console.log(`【评论列表】【加载列表】 评论总数=${pagination.total}, 总页数=${totalCommentPages}`);
-
     list.innerHTML = "";
 
     // 筛选仅父评论（子评论通过接口单独加载）
@@ -1974,14 +2094,19 @@ const reqParams = {
       console.groupEnd();
       return;
     }
+    let a =0;
     // 渲染所有父评论
     parentComments.forEach(parentComment => {
       parentComment.parent_id = null;
       console.log(`【评论列表】【加载列表】 加载子评论，父评论ID=${parentComment._id}, 子评论共${parentComment.replies_total}条`);
-
       renderCommentItem(parentComment);
+      a = a+parentComment.replies_total;
     });
-    console.log(`YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY【评论列表】【加载列表】 父评论渲染完成`);
+    console.log('parentComments',parentComments);
+
+   document.getElementById("commentsTotalCount").textContent = `${pagination.total+a || 0} 条评论`;
+    totalCommentPages = pagination.totalPages || 0;
+    console.log(`【评论列表】【加载列表】 评论总数=${pagination.total}, 总页数=${totalCommentPages}`);
 
     list.style.display = "block";
     empty.style.display = "none";
@@ -2044,11 +2169,35 @@ function handleAuthError() {
 }
 
 const lsID = '';
+// 删除评论
+async function deleteComment(commentId) {
+  try {
+    const token = localStorage.getItem('music_user_token');
+    if (!token) {
+      throw new Error('用户未登录');
+    }
+
+    const response = await axios.delete(`http://localhost:3000/api/comments/${commentId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (response.data.code === 200) {
+      return response.data;
+    } else {
+      throw new Error(response.data.message || '删除失败');
+    }
+  } catch (error) {
+    throw error;
+  }
+}
 /**
  * 渲染单条评论（含点赞、回复列表、回复表单）
  * @param {Object} comment - 评论数据
  * @param {boolean} insertToTop - 是否插入到列表顶部
  */
+
 async function renderCommentItem(comment, insertToTop = false) {
   // 校验父评论的parent_id
   if (comment.parent_id !== null && comment.parent_id !== undefined) {
@@ -2130,11 +2279,8 @@ async function renderCommentItem(comment, insertToTop = false) {
         <span>💬</span>
         <span>回复</span>
       </button>
-      ${toggleBtnHtml}
     </div>
-    <div class="empty-replies-tip" style="padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;">
-    
-    </div>
+    <div class="empty-replies-tip" style="padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;"></div>
     <div class="reply-form">
       <div class="reply-input-wrapper">
         <textarea class="reply-input" maxlength="500"></textarea>
@@ -2147,10 +2293,32 @@ async function renderCommentItem(comment, insertToTop = false) {
         </div>
       </div>
     </div>
+    ${replyCount > 0 ? `
+    <div class="comment-replies-toggle">
+      <div class="comment-replies-expand">
+        <button class="reply-btn toggle-replies-btn" data-comment-id="${comment._id}" data-reply-count="${replyCount}">
+          
+          <span>展开回复(${replyCount})</span>
+        </button>
+      </div>
+    </div>
+    ` : ''}
+<div class="comment-replies-controls" style="display: none; margin-top: 10px;">
+  <div style="display: flex; justify-content: flex-start; gap: 10px;">
+    <button class="reply-btn show-more-replies-btn" data-comment-id="${comment._id}" style="display: none;">
+     
+      <span>查看更多回复</span>
+    </button>
+    <button class="reply-btn collapse-replies-btn" data-comment-id="${comment._id}">
+      <span>&nbsp;</span>
+      <span>收起回复</span>
+    </button>
+  </div>
+</div>
   `;
   item.appendChild(avatar);
   item.appendChild(wrapper);
-
+ 
   // 插入到评论列表
   insertToTop ? list.insertBefore(item, list.firstChild) : list.appendChild(item);
 console.log('UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU', comment);
@@ -2158,6 +2326,19 @@ console.log('UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU', co
   if (insertToTop) {
     item.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+  
+
+
+let user = getUserFromCache();
+if (!user) {
+    user = await getCurrentUserInfo();
+    if (!user) {
+        // 用户信息失效，需要重新登录
+        localStorage.removeItem('music_user_token');
+        clearUserCache();
+        // 跳转到登录页
+    }
+}
 
   // ========== 绑定评论操作事件 ==========
   // 1. 绑定评论点赞事件
@@ -2168,11 +2349,43 @@ console.log('UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU', co
   if (likeBtn && heartIcon && likeCountEl) {
     likeBtn.addEventListener('click', () => {
       const realCommentId = likeBtn.dataset.commentId;
+      console.log('点击点赞按钮，评论ID:', realCommentId);
       handleCommentLike(realCommentId, likeBtn, heartIcon, likeCountEl);
     });
     heartIcon.classList.toggle('liked', comment.likedByMe);
   }
-
+  // 绑定删除按钮事件
+const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'delete-btn';
+  deleteBtn.textContent = '删除';
+  deleteBtn.setAttribute('data-comment-id', comment._id);
+  const actions = item.querySelector('.comment-actions');
+  if(comment.username ===  user.username){
+    actions.appendChild(deleteBtn);
+  }
+ console.log( 'comment._id',comment._id);
+deleteBtn.addEventListener('click', async () => {
+  try {
+item.remove();
+     deleteComment(deleteBtn.dataset.commentId);
+    
+    // 更新评论总数
+    const totalEl = document.getElementById("commentsTotalCount");
+    const currentTotal = parseInt(totalEl.textContent || '0', 10);
+    totalEl.textContent = `${Math.max(0, currentTotal - 1)} 条评论`;
+    // 如果评论列表为空，显示空提示
+    const list = document.getElementById("commentsList");
+    const empty = document.getElementById("emptyComments");
+    if (list.children.length === 0) {
+      empty.style.display = "block";
+    }
+    // 更新分页
+    renderCommentsPagination();
+  } catch (error) {
+    console.error('删除评论失败:', error);
+    showErrorToast('删除评论失败，请稍后重试');
+  }
+});
   // 2. 绑定回复按钮事件
   const replyBtn = item.querySelector('.reply-btn:not(.toggle-replies-btn)');
   const replyForm = item.querySelector('.reply-form');
@@ -2201,180 +2414,176 @@ console.log('UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU', co
     });
   }
 
-  // 3. 绑定展开/折叠回复按钮事件
-// ... existing code ...
+
   // 3. 绑定展开/折叠回复按钮事件
   const toggleRepliesBtn = item.querySelector('.toggle-replies-btn');
   
-  if (toggleRepliesBtn) {
-    // 获取回复数量
-    const replyCount = parseInt(toggleRepliesBtn.dataset.replyCount || '0', 10);
+  // 修改展开回复按钮事件
+if (toggleRepliesBtn) {
+  // 获取回复数量
+  const replyCount = parseInt(toggleRepliesBtn.dataset.replyCount || '0', 10);
+  
+  toggleRepliesBtn.addEventListener('click', async () => {
+    const commentId = toggleRepliesBtn.dataset.commentId;
+    console.log(`【展开回复】开始加载评论 ${commentId} 的回复数据`);
     
-    // 🔥 修改：只有当回复数量大于0时才添加展开回复按钮
-      if (replyCount > 0) {
-      // 创建新的展开回复按钮
-      const expandRepliesBtn = document.createElement('button');
-      expandRepliesBtn.className = 'reply-btn toggle-replies-btn';
-      expandRepliesBtn.setAttribute('data-comment-id', toggleRepliesBtn.dataset.commentId);
-      expandRepliesBtn.setAttribute('data-reply-count', replyCount);
-      expandRepliesBtn.style.display = 'inline-block';
-      expandRepliesBtn.innerHTML = '<span>📤</span><span>展开回复(' + replyCount + ')</span>';
-      
-      // 隐藏原来的展开回复按钮
-      toggleRepliesBtn.style.display = 'none';
-      
-      // 将新的展开回复按钮插入到原来展开按钮的位置
-      toggleRepliesBtn.parentNode.insertBefore(expandRepliesBtn, toggleRepliesBtn);
-      
-      // 绑定新的展开回复按钮事件
-      expandRepliesBtn.addEventListener('click', async () => {
-        const commentId = toggleRepliesBtn.dataset.commentId;
-        console.log(`【展开回复】开始加载评论 ${commentId} 的回复数据`);
-        
-        // 禁用按钮并显示加载状态
-        expandRepliesBtn.disabled = true;
-        expandRepliesBtn.innerHTML = '<span>⏳</span><span>加载中...</span>';
-        
-        try {
-          // 拉取后端数据
-          const replyData = await loadCommentReplies(commentId, 1, 10);
-          if (!replyData) {
-            showCommentTip('加载失败，请重试', 'error');
-            return;
-          }
-          
-          // 移除现有回复列表
-          const repliesList = item.querySelector('.replies-list');
-          const emptyRepliesTip = item.querySelector('.empty-replies-tip');
-          
-          if (repliesList) {
-            repliesList.remove();
-          }
-          
-          // 创建新的回复列表
-          const newRepliesList = document.createElement('div');
-          newRepliesList.className = 'replies-list';
-          
-          if (emptyRepliesTip) {
-            emptyRepliesTip.parentNode.replaceChild(newRepliesList, emptyRepliesTip);
-          } else {
-            const commentActions = item.querySelector('.comment-actions');
-            if (commentActions) {
-              commentActions.parentNode.insertBefore(newRepliesList, commentActions.nextSibling);
-            }
-          }
-          
-          // 更新回复数量
-          const realReplyCount = parseInt(replyData.pagination?.total || '0', 10);
-          toggleRepliesBtn.dataset.replyCount = realReplyCount;
-          
-          // 渲染回复项
-          if (replyData.replies && replyData.replies.length > 0) {
-            replyData.replies.forEach(reply => {
-              if (!reply.parent_id || reply.parent_id !== commentId) {
-                reply.parent_id = commentId;
-              }
-              renderReplyItem(reply, newRepliesList, false);
-            });
-          } else {
-            const emptyTip = document.createElement('div');
-            emptyTip.className = 'empty-replies-tip';
-            emptyTip.style.cssText = 'padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;';
-            emptyTip.textContent = '';
-            newRepliesList.appendChild(emptyTip);
-          }
-          
-          // 自动展开回复列表
-          toggleRepliesList(toggleRepliesBtn, newRepliesList, realReplyCount);
-          
-          // 隐藏新的展开回复按钮，显示原来的展开回复按钮
-          expandRepliesBtn.style.display = 'none';
-          toggleRepliesBtn.style.display = 'inline-block';
-          console.log(`【展开回复】加载完成，显示原来的展开回复按钮`);
-          
-        
-          
-        } catch (err) {
-          console.error('加载回复列表失败:', err);
-          showCommentTip('加载失败，请重试', 'error');
-        } finally {
-          // 恢复按钮状态
-          expandRepliesBtn.disabled = false;
-          expandRepliesBtn.innerHTML = '<span>📤</span><span>展开回复(' + replyCount + ')</span>';
-        }
-      });
-    }
-    // 原来的展开/折叠回复按钮事件（保持不变）
-    toggleRepliesBtn.addEventListener('click', async () => {
-      const commentId = toggleRepliesBtn.dataset.commentId;
-      const repliesList = item.querySelector('.replies-list');
-      const emptyRepliesTip = item.querySelector('.empty-replies-tip');
-      const replyCount = parseInt(toggleRepliesBtn.dataset.replyCount || '0', 10);
-
-      const hasTempReply = repliesList && repliesList.querySelector('.temp-reply');
-      const needsReload = !repliesList || hasTempReply;
-
-      if (repliesList && !needsReload) {
-        // 已有完整数据，直接切换显示状态
-        console.log('repliesList.children[0]', repliesList.children[0]);
-        console.log('repliesList', repliesList);
-        console.log('repliesList',commentId);
-        toggleRepliesList(toggleRepliesBtn, repliesList, replyCount);
+    // 禁用按钮并显示加载状态
+    toggleRepliesBtn.disabled = true;
+    toggleRepliesBtn.innerHTML = '<span>⏳</span><span>加载中...</span>';
+    
+    try {
+      // 拉取后端数据 - 先加载10条
+      const replyData = await loadCommentReplies(commentId, 1, 10);
+      if (!replyData) {
+        showCommentTip('加载失败，请重试', 'error');
         return;
       }
-
-      toggleRepliesBtn.disabled = true;
-      toggleRepliesBtn.innerHTML = '<span>⏳</span><span>加载中...</span>';
-
-      try {
-        const replyData = await loadCommentReplies(commentId, 1, 10);
-        if (!replyData) return;
-
-        // 移除现有回复列表（如果有）
-        if (repliesList) {
-          repliesList.remove();
+      
+      // 移除现有回复列表
+      const repliesList = item.querySelector('.replies-list');
+      const emptyRepliesTip = item.querySelector('.empty-replies-tip');
+      
+      if (repliesList) {
+        repliesList.remove();
+      }
+      
+      // 创建新的回复列表
+      const newRepliesList = document.createElement('div');
+      newRepliesList.className = 'replies-list show';
+      
+      if (emptyRepliesTip) {
+        emptyRepliesTip.parentNode.replaceChild(newRepliesList, emptyRepliesTip);
+      } else {
+        const commentActions = item.querySelector('.comment-actions');
+        if (commentActions) {
+          commentActions.parentNode.insertBefore(newRepliesList, commentActions.nextSibling);
         }
-
-        const newRepliesList = document.createElement('div');
-        newRepliesList.className = 'replies-list';
-
-        if (emptyRepliesTip) {
-          emptyRepliesTip.parentNode.replaceChild(newRepliesList, emptyRepliesTip);
-        } else {
-          const commentActions = item.querySelector('.comment-actions');
-          if (commentActions) {
-            commentActions.parentNode.insertBefore(newRepliesList, commentActions.nextSibling);
+      }
+      
+      // 更新回复数量
+      const realReplyCount = parseInt(replyData.pagination?.total || '0', 10);
+      toggleRepliesBtn.dataset.replyCount = realReplyCount;
+      
+      // 渲染回复项
+      if (replyData.replies && replyData.replies.length > 0) {
+        replyData.replies.forEach(reply => {
+          if (!reply.parent_id || reply.parent_id !== commentId) {
+            reply.parent_id = commentId;
           }
+          renderReplyItem(reply, newRepliesList, false);
+        });
+      } else {
+        const emptyTip = document.createElement('div');
+        emptyTip.className = 'empty-replies-tip';
+        emptyTip.style.cssText = 'padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;';
+        emptyTip.textContent = '';
+        newRepliesList.appendChild(emptyTip);
+      }
+      
+      // 显示控制按钮
+      const repliesControls = item.querySelector('.comment-replies-controls');
+      if (repliesControls) {
+        repliesControls.style.display = 'block';
+      }
+      
+      // 隐藏原始的展开回复按钮
+      const repliesToggle = item.querySelector('.comment-replies-toggle');
+      if (repliesToggle) {
+        repliesToggle.style.display = 'none';
+      }
+      
+      // 如果有更多回复，显示查看更多按钮
+      const showMoreBtn = item.querySelector('.show-more-replies-btn');
+      if (showMoreBtn) {
+        if (replyData.pagination?.totalPages > 1) {
+          showMoreBtn.style.display = 'inline-block';
         }
-
-        const realReplyCount = parseInt(replyData.pagination?.total || '0', 10);
-        toggleRepliesBtn.dataset.replyCount = realReplyCount;
-
-        if (replyData.replies && replyData.replies.length > 0) {
-          replyData.replies.forEach(reply => {
-            if (!reply.parent_id || reply.parent_id !== commentId) {
-              reply.parent_id = commentId;
-            }
-            renderReplyItem(reply, newRepliesList, false);
-          });
-        } else {
-          const emptyTip = document.createElement('div');
-          emptyTip.className = 'empty-replies-tip';
-          emptyTip.style.cssText = 'padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;';
-          emptyTip.textContent = '';
-          newRepliesList.appendChild(emptyTip);
-        }
-
-        toggleRepliesList(toggleRepliesBtn, newRepliesList, realReplyCount);
-      } catch (err) {
-        console.error('加载回复列表失败:', err);
-        showCommentTip('加载回复失败，请重试', 'error');
-      } finally {
-        toggleRepliesBtn.disabled = false;
+      }
+      
+    } catch (err) {
+      console.error('加载回复列表失败:', err);
+      showCommentTip('加载失败，请重试', 'error');
+    } finally {
+      // 恢复按钮状态
+      toggleRepliesBtn.disabled = false;
+      toggleRepliesBtn.innerHTML = '<span>展开回复(' + replyCount + ')</span>';
+    }
+  });
+  
+  // 绑定收起回复按钮事件
+  const collapseBtn = item.querySelector('.collapse-replies-btn');
+  if (collapseBtn) {
+    collapseBtn.addEventListener('click', () => {
+      const commentId = collapseBtn.dataset.commentId;
+      const repliesList = item.querySelector('.replies-list');
+      const repliesControls = item.querySelector('.comment-replies-controls');
+      const repliesToggle = item.querySelector('.comment-replies-toggle');
+      const showMoreBtn = item.querySelector('.show-more-replies-btn');
+      
+      // 隐藏回复列表
+      if (repliesList) {
+        repliesList.remove();
+      }
+      
+      // 显示空回复提示
+      const emptyRepliesTip = document.createElement('div');
+      emptyRepliesTip.className = 'empty-replies-tip';
+      emptyRepliesTip.style.cssText = 'padding: 1rem 0; color: var(--text-muted); font-size: 0.875rem; text-align: left;';
+      
+      const replyForm = item.querySelector('.reply-form');
+      if (replyForm) {
+        replyForm.parentNode.insertBefore(emptyRepliesTip, replyForm);
+      }
+      
+      // 隐藏控制按钮
+      if (repliesControls) {
+        repliesControls.style.display = 'none';
+      }
+      
+      // 显示原始的展开回复按钮
+      if (repliesToggle) {
+        repliesToggle.style.display = 'block';
+      }
+      
+      // 隐藏查看更多按钮
+      if (showMoreBtn) {
+        showMoreBtn.style.display = 'none';
       }
     });
   }
-// ... existing code ...
+  
+  // 绑定查看更多回复按钮事件
+  const showMoreBtn = item.querySelector('.show-more-replies-btn');
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener('click', async () => {
+      const commentId = showMoreBtn.dataset.commentId;
+      
+      // 加载所有回复
+      const replyData = await loadCommentReplies(commentId, 1, 100);
+      if (!replyData) {
+        showCommentTip('加载失败，请重试', 'error');
+        return;
+      }
+      
+      // 更新回复列表
+      const repliesList = item.querySelector('.replies-list');
+      if (repliesList) {
+        // 清空现有回复
+        repliesList.innerHTML = '';
+        
+        // 渲染所有回复
+        if (replyData.replies && replyData.replies.length > 0) {
+          replyData.replies.forEach(reply => {
+            renderReplyItem(reply, repliesList, false);
+          });
+        }
+      }
+      
+      // 隐藏查看更多按钮
+      showMoreBtn.style.display = 'none';
+    });
+  }
+}
   console.log(`【评论渲染】【父评论渲染】 评论渲染完成，事件绑定完成`);
   return item;
 }
@@ -2554,6 +2763,10 @@ function initCommentForm() {
           const toggleBtn = tempCommentEl.querySelector(`.toggle-replies-btn[data-comment-id="${tempCommentId}"]`);
           if (toggleBtn) toggleBtn.dataset.commentId = realCommentId;
           tempCommentEl.classList.remove('temp-comment');
+          const deleteBtn = tempCommentEl.querySelector(`.delete-btn[data-comment-id="${tempCommentId}"]`);
+          if (deleteBtn) deleteBtn.setAttribute('data-comment-id', realCommentId);
+
+
           console.log(`【评论发布】【提交评论】 临时ID替换完成，更新为真实ID=${realCommentId}`);
         }
 
@@ -2565,12 +2778,11 @@ function initCommentForm() {
   
         showCommentTip('评论发布成功！');
       }
-  
+
       refreshUserInfo(token);
     } catch (err) {
       console.error(`【评论发布】【提交评论】 评论提交失败，错误详情=`, err);
       showCommentTip('评论发布失败，请稍后再试', 'error');
-      
       // 回滚UI
       const tempCommentEl = document.querySelector(`.comment-item[data-comment-id="${tempCommentId}"]`);
       if (tempCommentEl) {
@@ -2611,13 +2823,13 @@ async function loadPage() {
     console.log(`【页面初始化】【主加载函数】 获取资源信息成功=`, resource);
     
     // 处理专辑信息
-    let albumName = '单曲/未知专辑';
+    let albumName = '单曲';
     let releaseDate = '未知';
     if (resource.album_id && resource.album_id !== 'undefined' && resource.album_id !== '') {
       try {
         const albumRes = await axios.get(`http://localhost:3000/api/albums/${resource.album_id}`, { withCredentials: true });
         const album = albumRes.data.data;
-        albumName = album.name_cn || '单曲/未知专辑';
+        albumName = album.name_cn || '单曲';
         releaseDate = album.release_date || '未知';
         console.log(`【页面初始化】【主加载函数】 获取专辑信息成功=`, album);
       } catch (albumErr) {

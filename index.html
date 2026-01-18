@@ -218,7 +218,7 @@
                     // 渲染结构和列表页完全对齐
                     tr.innerHTML = `
                         <td class="song-name" style="font-weight: 600; color: #1e293b;">${escapeHtml(item.name_cn)}</td>
-                        <td style="color: #64748b">${escapeHtml(item.album_name || '单曲/未知')}</td>
+                        <td style="color: #64748b">${escapeHtml(item.album_name || '单曲')}</td>
                         <td style="color: #64748b">${escapeHtml(item.release_date || '—')}</td>
                         <td>
                             <span class="score-badge">${item.averageScore || '0.0'}</span>
