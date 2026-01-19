@@ -14,7 +14,9 @@
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
+    "fast-levenshtein": "^3.0.0",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.1.0"
+    "mongoose": "^9.1.0",
+    "pinyin": "^4.0.0"
   }
 }

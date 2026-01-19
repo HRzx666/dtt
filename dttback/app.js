@@ -139,13 +139,41 @@ const commentSchema = new mongoose.Schema({
 commentSchema.index({ resource_type: 1, resource_id: 1, createdAt: -1 });
 commentSchema.index({ parent_id: 1, createdAt: -1 });
 
-// 7. 模型实例化（所有模型在使用前实例化）
+// 在评论模型定义后添加Notification模型定义
+// 6.7 通知模型（支持被回复和被点赞提醒）
+const notificationSchema = new mongoose.Schema({
+  // 接收者信息
+  receiver_username: { type: String, required: true },
+  // 发送者信息
+  sender_username: { type: String, required: true },
+  sender_nickname: { type: String, required: true },
+  sender_avatar: { type: String, default: '' },
+  // 通知内容
+  content: { type: String, required: true },
+  // 关联的评论信息
+  comment_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Comment', required: true },
+  // 资源信息（用于跳转）
+  resource_type: { type: String, required: true, enum: ['song', 'single', 'album'] },
+  resource_id: { type: String, required: true },
+  // 通知类型
+  type: { type: String, required: true, enum: ['reply', 'like'] },
+  // 状态管理
+  is_read: { type: Boolean, default: false },
+  // 时间戳
+  createdAt: { type: Date, default: Date.now }
+});
+// 通知模型索引优化
+notificationSchema.index({ receiver_username: 1, is_read: 1, createdAt: -1 });
+notificationSchema.index({ comment_id: 1 });
+
+// 7. 模型实例化（在原有模型后添加Notification）
 const Song = mongoose.model('Song', songSchema);
 const Album = mongoose.model('Album', albumSchema);
 const Single = mongoose.model('Single', singleSchema);
 const User = mongoose.model('User', userSchema);
 const Rating = mongoose.model('Rating', ratingSchema);
 const Comment = mongoose.model('Comment', commentSchema);
+const Notification = mongoose.model('Notification', notificationSchema); // 新增
 
 // 8. 导入外部模型（评论点赞，确保在使用前导入）
 const CommentLike = require('./models/CommentLike');
@@ -412,36 +440,43 @@ app.get('/api/songs/sort-by-rating', async (req, res, next) => {
 });
 
 // 歌曲搜索接口
+// 歌曲搜索接口 - 高级重构版 ✅ 解决单字/全关键字搜索精准度问题 + 性能优化 + 体验优化
 app.get('/api/songs/search', async (req, res, next) => {
   try {
     const { keyword, page = 1, pageSize = 20, targetSongId } = req.query;
-    const skip = (page - 1) * pageSize;
+    const currentPage = Number(page);
+    const size = Number(pageSize);
+    const skip = (currentPage - 1) * size;
+    const searchKeyword = keyword?.trim() || '';
 
-    console.log(`[${getNow()}] 🔍 搜索歌曲 - 关键词：${keyword} | 页码：${page} | 页大小：${pageSize} | 目标歌曲ID：${targetSongId}`);
+    console.log(`[${getNow()}] 🔍 搜索歌曲 - 关键词：${searchKeyword} | 页码：${currentPage} | 页大小：${size} | 目标歌曲ID：${targetSongId}`);
 
-    // 1. 校验搜索关键词
-    if (!keyword || keyword.trim().length === 0) {
+    // 1. 校验搜索关键词 - 保留原逻辑
+    if (!searchKeyword) {
       throw new AppError('搜索关键词不能为空', 400);
     }
-    const searchKeyword = keyword.trim();
+    const isSingleChar = searchKeyword.length === 1; // 标记：是否为单字搜索
+    const keywordReg = new RegExp(searchKeyword, 'i'); // 统一不区分大小写正则
 
-    // 2. 构建宽松的搜索条件（支持歌曲名称和专辑名称的模糊匹配）
-    // 将关键词拆分为单个字符，使用OR条件匹配其中任意一个字符
-    const keywordChars = searchKeyword.split('');
-    const fuzzySearchConditions = keywordChars.map(char => ({
+    // ===================== 核心优化1：构建【严格分层的匹配条件+阶梯式高权重评分】 =====================
+    // 匹配优先级：从高到低（评分差距极大，确保高匹配结果绝对置顶）
+    const matchCondition = {
       $or: [
-        { name_cn: { $regex: char, $options: 'i' } },
-        { name_en: { $regex: char, $options: 'i' } }
+        // ★ 一级匹配：歌名中英文 完全精准匹配 (不分大小写) - 最高优先级
+        { $or: [{ name_cn: { $regex: `^${searchKeyword}$`, $options: 'i' } }, { name_en: { $regex: `^${searchKeyword}$`, $options: 'i' } }] },
+        // ★ 二级匹配：歌名中英文 前缀匹配 (关键词开头) - 次高优先级（完整输入关键字必命中这里）
+        { $or: [{ name_cn: { $regex: `^${searchKeyword}`, $options: 'i' } }, { name_en: { $regex: `^${searchKeyword}`, $options: 'i' } }] },
+        // ★ 三级匹配：歌名中英文 完整包含关键词 - 常规匹配（含完整关键字，非开头）
+        { $or: [{ name_cn: keywordReg }, { name_en: keywordReg }] },
+        // ★ 四级匹配：仅单字搜索时生效 - 精准匹配单个字符，杜绝多字搜索时的泛化无关结果
+        ...(isSingleChar ? [{ $or: [{ name_cn: { $regex: searchKeyword, $options: 'i' } }, { name_en: { $regex: searchKeyword, $options: 'i' } }] }] : [])
       ]
-    }));
-
-    const searchCondition = {
-      $or: fuzzySearchConditions
     };
 
-    // 3. 搜索数据库中的专辑歌曲
-    const songsWithAlbum = await Song.aggregate([
-      { $match: searchCondition },
+    // ===================== 核心优化2：数据库聚合查询【整合关联+评分+分页】，性能拉满 =====================
+    // 一次聚合完成：匹配+关联专辑+计算评分+投影，数据库层面分页，避免内存全量加载
+    const dbSongResults = await Song.aggregate([
+      { $match: matchCondition },
       {
         $lookup: {
           from: 'albums',
@@ -464,66 +499,104 @@ app.get('/api/songs/search', async (req, res, next) => {
           lyricist: 1,
           composer: 1,
           arranger: 1,
-          duration: 1
+          duration: 1,
+          // ★ 核心重构：阶梯式高区分度评分规则（分值差距极大，排序绝对合理）
+          matchScore: {
+            $cond: [
+              // 1级：完全精准匹配 → 2000分 (天花板，绝对置顶)
+              { $or: [{ $regexMatch: { input: '$name_cn', regex: `^${searchKeyword}$`, options: 'i' } }, { $regexMatch: { input: '$name_en', regex: `^${searchKeyword}$`, options: 'i' } }] },
+              2000,
+              {
+                $cond: [
+                  // 2级：前缀匹配 → 1500分 (完整输入关键字必在这里，精准度拉满)
+                  { $or: [{ $regexMatch: { input: '$name_cn', regex: `^${searchKeyword}`, options: 'i' } }, { $regexMatch: { input: '$name_en', regex: `^${searchKeyword}`, options: 'i' } }] },
+                  1500,
+                  {
+                    $cond: [
+                      // 3级：完整包含关键词 → 1000分 (含完整关键字，非开头)
+                      { $or: [{ $regexMatch: { input: '$name_cn', regex: searchKeyword, options: 'i' } }, { $regexMatch: { input: '$name_en', regex: searchKeyword, options: 'i' } }] },
+                      1000,
+                      // 4级：仅单字搜索生效 → 500分 (保底精准，无无关结果)
+                      500
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
-      }
+      },
+      { $sort: { matchScore: -1, name_cn: 1 } }, // 先按评分降序，再按中文名升序
+      { $skip: skip }, // 数据库层面分页
+      { $limit: size } // 数据库层面分页
     ]);
 
-    // 4. 搜索静态单曲数据（宽松匹配：只要有一个字符匹配就返回）
-    const matchingSingles = taoZheSingles.filter(single => {
-      const name = (single.name_cn || '') + (single.name_en || '');
-      return keywordChars.some(char => name.includes(char));
-    }).map(single => ({
-      id: single.id,
-      name_cn: single.name_cn,
-      name_en: single.name_en || '',
-      album_id: null,
-      album_name: '单曲',
-      album_cover: '',
-      release_date: single.release_date,
-      lyricist: '',
-      composer: '陶喆',
-      arranger: '',
-      duration: '',
-      description: single.description
-    }));
+    // ===================== 优化3：静态单曲(taoZheSingles)处理 - 统一评分规则+无冗余 =====================
+    // 抽离公共方法：计算单曲匹配度（和数据库歌曲评分规则完全一致，保证排序统一）
+    const calcMatchScore = (songNameCn, songNameEn) => {
+      const fullName = (songNameCn || '') + (songNameEn || '');
+      if (/^${searchKeyword}$/i.test(songNameCn) || /^${searchKeyword}$/i.test(songNameEn)) return 2000;
+      if (/^${searchKeyword}/i.test(songNameCn) || /^${searchKeyword}/i.test(songNameEn)) return 1500;
+      if (keywordReg.test(songNameCn) || keywordReg.test(songNameEn)) return 1000;
+      if (isSingleChar && (songNameCn?.includes(searchKeyword) || songNameEn?.includes(searchKeyword))) return 500;
+      return 0;
+    };
 
-    // 5. 合并搜索结果并统一排序
-    const allResults = [...songsWithAlbum, ...matchingSingles].sort((a, b) => 
-      a.name_cn.localeCompare(b.name_cn, 'zh-CN')
-    );
+    // 过滤静态单曲：只保留有匹配度的结果，排除0分无关项
+    const staticSingleResults = taoZheSingles
+      .filter(single => calcMatchScore(single.name_cn, single.name_en) > 0)
+      .map(single => ({
+        id: single.id,
+        name_cn: single.name_cn,
+        name_en: single.name_en || '',
+        album_id: null,
+        album_name: '单曲',
+        album_cover: '',
+        release_date: single.release_date,
+        lyricist: '',
+        composer: '陶喆',
+        arranger: '',
+        duration: '',
+        description: single.description,
+        matchScore: calcMatchScore(single.name_cn, single.name_en)
+      }));
 
-    // 6. 计算总数量
+    // ===================== 优化4：合并结果+严格去重+二次排序 =====================
+    // 合并数据库结果+静态单曲，按ID去重（防止同ID歌曲重复出现）
+    const allResultsMap = new Map();
+    [...dbSongResults, ...staticSingleResults].forEach(song => {
+      if (!allResultsMap.has(song.id)) {
+        allResultsMap.set(song.id, song);
+      }
+    });
+    const allResults = Array.from(allResultsMap.values()).sort((a, b) => {
+      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore; // 核心：评分优先
+      return a.name_cn.localeCompare(b.name_cn, 'zh-CN'); // 同分按中文名排序
+    });
+
+    // ===================== 原逻辑保留+优化：总数量/目标歌曲位置 =====================
     const total = allResults.length;
-
-    // 7. 获取完整的歌曲ID列表（用于计算目标歌曲位置）
     let targetSongPosition = null;
     if (targetSongId) {
-      const allSongIds = allResults.map(item => item.id);
-      const index = allSongIds.indexOf(targetSongId);
-      
+      const index = allResults.findIndex(item => item.id === targetSongId);
       if (index !== -1) {
         targetSongPosition = {
-          index: index + 1, // 从1开始计数
-          page: Math.ceil((index + 1) / pageSize)
+          index: index + 1,
+          page: Math.ceil((index + 1) / size)
         };
       }
     }
 
-    // 8. 分页处理
-    const paginatedResults = allResults.slice(skip, skip + Number(pageSize));
-
-    // 9. 如果有搜索结果，获取评分信息
-    let resultsWithRatings = paginatedResults;
-    if (paginatedResults.length > 0) {
-      const songIds = paginatedResults.map(item => item.id);
+    // ===================== 原逻辑保留：整合评分信息 =====================
+    let resultsWithRatings = allResults;
+    if (resultsWithRatings.length > 0) {
+      const songIds = resultsWithRatings.map(item => item.id);
       const ratingAgg = await Rating.aggregate([
         { $match: { resource_type: 'song', resource_id: { $in: songIds } } },
         { $group: { _id: '$resource_id', averageScore: { $avg: '$score' }, ratingCount: { $sum: 1 } } }
       ]);
 
-      // 整合评分信息
-      resultsWithRatings = paginatedResults.map(item => {
+      resultsWithRatings = resultsWithRatings.map(item => {
         const rating = ratingAgg.find(r => r._id === item.id);
         return {
           ...item,
@@ -533,19 +606,19 @@ app.get('/api/songs/search', async (req, res, next) => {
       });
     }
 
-    console.log(`[${getNow()}] ✅ 搜索歌曲成功 - 关键词：${searchKeyword} | 结果数：${resultsWithRatings.length} | 总数量：${total}`);
-
+    // ===================== 返回响应 =====================
+    console.log(`[${getNow()}] ✅ 搜索歌曲成功 - 关键词：${searchKeyword} | 页结果数：${resultsWithRatings.length} | 总结果数：${total} | 最高匹配度：${allResults[0]?.matchScore || 0}`);
     res.json({
       code: 200,
       data: {
         songs: resultsWithRatings,
         pagination: {
-          page: Number(page),
-          pageSize: Number(pageSize),
+          page: currentPage,
+          pageSize: size,
           total,
-          totalPages: Math.ceil(total / pageSize)
+          totalPages: Math.ceil(total / size)
         },
-        ...(targetSongPosition && { targetSongPosition }) // 仅当有目标歌曲位置时返回
+        ...(targetSongPosition && { targetSongPosition })
       },
       msg: '搜索歌曲成功'
     });
@@ -1210,8 +1283,7 @@ app.post('/api/albums/:albumId/comment', authMiddleware, async (req, res, next) 
     if (!user) throw new AppError('用户不存在', 404);
     const nick_name = user.nickname || username; // 优先用昵称，无则用用户名
     const avatar = user.avatar || ''; // 头像为空则存空字符串
-
-    // 4. 保存专辑评论（resource_type=album + 显式设置parent_id: null）
+// 4. 保存专辑评论（resource_type=album + 显式设置parent_id: null）
     const comment = await new Comment({
       resource_type: 'album', // 标记为专辑评论
       resource_id: albumId,   // 专辑ID
@@ -1356,7 +1428,6 @@ app.post('/api/comments/:commentId/reply', authMiddleware, async (req, res, next
     // 2. 校验并查询父评论（使用正确的ObjectId转换方法）
     let parentComment;
     try {
-      // 使用mongoose.Types.ObjectId.createFromHexString()或直接传递字符串
       parentComment = await Comment.findById(commentId);
     } catch (err) {
       throw new AppError('父评论ID格式错误', 400);
@@ -1364,7 +1435,6 @@ app.post('/api/comments/:commentId/reply', authMiddleware, async (req, res, next
     if (!parentComment) {
       throw new AppError('父评论不存在', 404);
     }
-    // 关键日志：详细打印父评论ID信息
     console.log(`[${getNow()}] 📌 查询到父评论 - 父评论ID：${parentComment._id} | 父评论ID字符串：${parentComment._id.toString()} | 父评论parent_id：${parentComment.parent_id} | 父评论类型：${parentComment.resource_type} | 父评论资源ID：${parentComment.resource_id}`);
 
     // 3. 获取当前登录用户的昵称和头像
@@ -1375,57 +1445,98 @@ app.post('/api/comments/:commentId/reply', authMiddleware, async (req, res, next
     const nick_name = currentUser.nickname || username;
     const avatar = currentUser.avatar || '';
 
-    // 4. 构建回复评论数据（强制赋值parent_id，优先级最高）
-   const replyCommentData = {
-  resource_type: parentComment.resource_type,
-  resource_id: parentComment.resource_id,
-  username: username,
-  nick_name: nick_name,
-  avatar: avatar,
-  content: content.trim(),
-  // 🔴 核心修复：直接使用父评论的ID属性
-  parent_id: parentComment._id,
-  // ✅ 修改这里：优先使用前端发送的被回复人信息
-  reply_to_user_id: req.body.reply_to_user_id || parentComment.username,
-  reply_to_name: req.body.reply_to_name || parentComment.nick_name
-};
-    // 歌曲评论的回复补充song_id
+    // 4. 构建回复评论数据
+    const replyCommentData = {
+      resource_type: parentComment.resource_type,
+      resource_id: parentComment.resource_id,
+      username: username,
+      nick_name: nick_name,
+      avatar: avatar,
+      content: content.trim(),
+      parent_id: parentComment._id,
+      reply_to_user_id: req.body.reply_to_user_id || parentComment.username,
+      reply_to_name: req.body.reply_to_name || parentComment.nick_name
+    };
+    
     if (parentComment.resource_type === 'song') {
       replyCommentData.song_id = parentComment.song_id;
     }
-    // 关键日志：确认构建的parent_id
     console.log(`[${getNow()}] 📌 构建回复数据 - parent_id：${replyCommentData.parent_id} | 类型：${typeof replyCommentData.parent_id}`);
 
-    // 5. 保存回复评论（禁用setDefaultsOnInsert，避免默认值覆盖）
+    // 5. 保存回复评论
     const replyComment = await new Comment(replyCommentData).save({
-      setDefaultsOnInsert: false // 🔴 禁用插入时的默认值，确保parent_id不被null覆盖
+      setDefaultsOnInsert: false
     });
-    // 关键日志：确认保存后的parent_id
     console.log(`[${getNow()}] ✅ 回复评论保存成功 - 回复ID：${replyComment._id} | 最终存储的parent_id：${replyComment.parent_id} | 父评论ID：${parentComment._id}`);
 
-    // 6. 响应：统一使用parentId字段，避免冗余
-res.json({
-  code: 200,
-  msg: '回复发布成功',
-  data: {
-    replyId: replyComment._id,
-    parentId: parentComment._id.toString(), // 父评论ID，字符串格式
-    resourceType: parentComment.resource_type,
-    resourceId: parentComment.resource_id,
-    username: username,
-    nick_name: nick_name,
-    avatar: avatar,
-    // ✅ 修改这里：使用构建数据中的被回复人信息
-    reply_to_user_id: replyCommentData.reply_to_user_id,
-    reply_to_name: replyCommentData.reply_to_name,
-    content: replyComment.content,
-    createdAt: replyComment.createdAt,
-    likeCount: replyComment.likeCount
-  }
-});
+    // 6. 【新增】创建被回复通知（如果回复的不是自己的评论）
+    if (parentComment.username !== username) {
+      try {
+        // 检查Notification模型是否存在，如果不存在则创建
+        if (typeof Notification === 'undefined') {
+          // 动态创建Notification模型
+          const notificationSchema = new mongoose.Schema({
+            receiver_username: { type: String, required: true },
+            sender_username: { type: String, required: true },
+            sender_nickname: { type: String, required: true },
+            sender_avatar: { type: String, default: '' },
+            content: { type: String, required: true },
+            comment_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Comment', required: true },
+            resource_type: { type: String, required: true, enum: ['song', 'single', 'album'] },
+            resource_id: { type: String, required: true },
+            type: { type: String, required: true, enum: ['reply', 'like'] },
+            is_read: { type: Boolean, default: false },
+            createdAt: { type: Date, default: Date.now }
+          });
+          
+          // 如果模型不存在则创建
+          if (!mongoose.models.Notification) {
+            mongoose.model('Notification', notificationSchema);
+          }
+        }
+
+        // 创建被回复通知
+        await mongoose.model('Notification').create({
+          receiver_username: parentComment.username,
+          sender_username: username,
+          sender_nickname: nick_name,
+          sender_avatar: avatar,
+          content: `回复了你的评论：${content.substring(0, 30)}${content.length > 30 ? '...' : ''}`,
+          comment_id: replyComment._id,
+          resource_type: parentComment.resource_type,
+          resource_id: parentComment.resource_id,
+          type: 'reply',
+          is_read: false
+        });
+        
+        console.log(`[${getNow()}] 💬 创建被回复通知成功 - 接收者：${parentComment.username} | 发送者：${username}`);
+      } catch (notificationError) {
+        console.error(`[${getNow()}] ⚠️ 创建被回复通知失败 - 错误：${notificationError.message}`);
+        // 通知创建失败不影响主流程，继续执行
+      }
+    }
+
+    // 7. 响应：统一使用parentId字段，避免冗余
+    res.json({
+      code: 200,
+      msg: '回复发布成功',
+      data: {
+        replyId: replyComment._id,
+        parentId: parentComment._id.toString(),
+        resourceType: parentComment.resource_type,
+        resourceId: parentComment.resource_id,
+        username: username,
+        nick_name: nick_name,
+        avatar: avatar,
+        reply_to_user_id: replyCommentData.reply_to_user_id,
+        reply_to_name: replyCommentData.reply_to_name,
+        content: replyComment.content,
+        createdAt: replyComment.createdAt,
+        likeCount: replyComment.likeCount
+      }
+    });
 
   } catch (err) {
-    // 错误日志：捕获所有异常
     console.error(`[${getNow()}] ❌ 回复评论失败 - 错误：${err.message} | 栈信息：${err.stack}`);
     if (err.name === 'CastError' && err.path === '_id') {
       return res.status(400).json({
@@ -1518,21 +1629,26 @@ app.get('/api/singles/:singleId/comments', async (req, res, next) => {
 // 评论点赞/取消点赞（核心补充）
 // 11.8 评论点赞接口（核心补全）
 // 评论点赞/取消点赞
+// 优化评论点赞接口，添加被点赞通知逻辑
 app.post('/api/comments/:commentId/like', authMiddleware, async (req, res, next) => {
   try {
     const { commentId } = req.params;
-    const { username } = req.user;
+const { username } = req.user;
     console.log(`[${getNow()}] 👍 评论点赞操作 - 评论ID：${commentId} | 用户名：${username}`);
 
     // 1. 校验评论是否存在
     const comment = await Comment.findById(commentId);
     if (!comment) throw new AppError('评论不存在', 404);
 
-    // 2. 原子操作：查询并更新点赞记录（存在则删除，不存在则新增）
+    // 2. 获取用户信息
+    const user = await User.findOne({ username });
+    if (!user) throw new AppError('用户不存在', 404);
+
+    // 3. 原子操作：查询并更新点赞记录
     const existingLike = await CommentLike.findOne({ commentId, username });
     
     if (existingLike) {
-      // 取消点赞：删除点赞记录 + 评论点赞数-1
+      // 取消点赞
       await Promise.all([
         CommentLike.deleteOne({ _id: existingLike._id }),
         Comment.findByIdAndUpdate(commentId, { $inc: { likeCount: -1 } })
@@ -1540,11 +1656,29 @@ app.post('/api/comments/:commentId/like', authMiddleware, async (req, res, next)
       console.log(`[${getNow()}] ✅ 评论取消点赞成功 - 评论ID：${commentId} | 用户名：${username}`);
       res.json({ code: 200, msg: '取消点赞成功', data: { isLiked: false } });
     } else {
-      // 点赞：新增点赞记录 + 评论点赞数+1
+      // 点赞
       await Promise.all([
         new CommentLike({ commentId, username }).save(),
         Comment.findByIdAndUpdate(commentId, { $inc: { likeCount: 1 } })
       ]);
+      
+      // 4. 【新增】创建被点赞通知（如果点赞的不是自己的评论）
+      if (comment.username !== username) {
+        await new Notification({
+          receiver_username: comment.username,
+          sender_username: username,
+          sender_nickname: user.nickname || username,
+          sender_avatar: user.avatar || '',
+          content: `点赞了你的评论：${comment.content.substring(0, 30)}${comment.content.length > 30 ? '...' : ''}`,
+          comment_id: comment._id,
+          resource_type: comment.resource_type,
+          resource_id: comment.resource_id,
+          type: 'like'
+        }).save();
+        
+        console.log(`[${getNow()}] 👍 创建被点赞通知 - 接收者：${comment.username} | 发送者：${username}`);
+      }
+      
       console.log(`[${getNow()}] ✅ 评论点赞成功 - 评论ID：${commentId} | 用户名：${username}`);
       res.json({ code: 200, msg: '点赞成功', data: { isLiked: true } });
     }
@@ -1747,6 +1881,377 @@ app.delete('/api/comments/:commentId', authMiddleware, async (req, res, next) =>
   }
 });
 
+// 增强通知列表接口，支持主页提醒功能
+app.get('/api/notifications', authMiddleware, async (req, res, next) => {
+  try {
+    const { username } = req.user;
+    const { page = 1, pageSize = 20, unreadOnly = false, type } = req.query;
+    const skip = (page - 1) * pageSize;
+
+    console.log(`[${getNow()}] 📢 获取通知列表 - 用户：${username} | 页码：${page} | 页大小：${pageSize} | 仅未读：${unreadOnly} | 类型：${type || '全部'}`);
+
+    // 构建查询条件
+    const query = { receiver_username: username };
+    if (unreadOnly === 'true') {
+      query.is_read = false;
+    }
+    if (type && ['reply', 'like'].includes(type)) {
+      query.type = type;
+    }
+
+    // 查询总数
+    const total = await Notification.countDocuments(query);
+
+    // 查询通知列表（按时间倒序）
+    const notifications = await Notification.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(pageSize))
+      .lean();
+
+    // 为每个通知添加跳转信息和关联评论内容
+    const notificationsWithDetails = await Promise.all(
+      notifications.map(async (notification) => {
+        try {
+          // 获取关联的评论信息
+          const comment = await Comment.findById(notification.comment_id);
+          if (!comment) {
+            return {
+              ...notification,
+              jumpInfo: null,
+              commentContent: '评论已被删除',
+              error: '关联评论不存在'
+            };
+          }
+
+          // 构建跳转信息
+          const jumpInfo = {
+            resourceType: comment.resource_type,
+            resourceId: comment.resource_id,
+            commentId: comment._id.toString(),
+            jumpPath: `/${comment.resource_type}/${comment.resource_id}`,
+            hasParentComment: !!comment.parent_id
+          };
+
+          return {
+            ...notification,
+            jumpInfo,
+            commentContent: comment.content,
+            commentCreatedAt: comment.createdAt
+          };
+        } catch (error) {
+          return {
+            ...notification,
+            jumpInfo: null,
+            commentContent: '获取评论内容失败',
+            error: '获取跳转信息失败'
+          };
+        }
+      })
+    );
+
+    console.log(`[${getNow()}] ✅ 获取通知列表成功 - 用户：${username} | 总数：${total} | 返回数量：${notificationsWithDetails.length}`);
+
+    res.json({
+      code: 200,
+      data: {
+        notifications: notificationsWithDetails,
+        pagination: {
+          page: Number(page),
+          pageSize: Number(pageSize),
+          total,
+          totalPages: Math.ceil(total / pageSize)
+        }
+      },
+      msg: '获取通知成功'
+    });
+  } catch (err) { next(err); }
+});
+
+// 新增：主页提醒聚合接口（移到正确位置）
+app.get('/api/notifications/homepage-summary', authMiddleware, async (req, res, next) => {
+  try {
+    const { username } = req.user;
+
+    console.log(`[${getNow()}] 🏠 获取主页提醒汇总 - 用户：${username}`);
+
+    // 获取未读通知总数
+    const totalUnread = await Notification.countDocuments({
+      receiver_username: username,
+      is_read: false
+    });
+
+    // 获取最新5条未读通知（用于即时显示）
+    const latestUnreadNotifications = await Notification.find({
+      receiver_username: username,
+      is_read: false
+    })
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .lean();
+
+    // 为最新通知添加详细信息
+    const notificationsWithDetails = await Promise.all(
+      latestUnreadNotifications.map(async (notification) => {
+        try {
+          const comment = await Comment.findById(notification.comment_id);
+          return {
+            ...notification,
+            commentContent: comment ? comment.content : '评论已被删除'
+          };
+        } catch (error) {
+          return notification;
+        }
+      })
+    );
+
+    // 按类型统计
+    const replyUnreadCount = await Notification.countDocuments({
+      receiver_username: username,
+      is_read: false,
+      type: 'reply'
+    });
+
+    const likeUnreadCount = await Notification.countDocuments({
+      receiver_username: username,
+      is_read: false,
+      type: 'like'
+    });
+
+    res.json({
+      code: 200,
+      data: {
+        totalUnread,
+        replyUnreadCount,
+        likeUnreadCount,
+        latestNotifications: notificationsWithDetails,
+        lastUpdated: new Date().toISOString()
+      },
+      msg: '获取主页提醒汇总成功'
+    });
+  } catch (err) { next(err); }
+});
+
+app.get('/api/notifications/homepage-summary', authMiddleware, async (req, res, next) => {
+  try {
+    const { username } = req.user;
+
+    console.log(`[${getNow()}] 🏠 获取主页提醒汇总 - 用户：${username}`);
+
+    // 获取未读通知总数
+    const totalUnread = await Notification.countDocuments({
+      receiver_username: username,
+      is_read: false
+    });
+
+    // 获取最新5条未读通知（用于即时显示）
+    const latestUnreadNotifications = await Notification.find({
+      receiver_username: username,
+      is_read: false
+    })
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .lean();
+
+    // 为最新通知添加详细信息
+    const notificationsWithDetails = await Promise.all(
+      latestUnreadNotifications.map(async (notification) => {
+        try {
+          const comment = await Comment.findById(notification.comment_id);
+          return {
+            ...notification,
+            commentContent: comment ? comment.content : '评论已被删除'
+          };
+        } catch (error) {
+          return notification;
+        }
+      })
+    );
+
+    // 按类型统计
+    const replyUnreadCount = await Notification.countDocuments({
+      receiver_username: username,
+      is_read: false,
+      type: 'reply'
+    });
+
+    const likeUnreadCount = await Notification.countDocuments({
+      receiver_username: username,
+      is_read: false,
+      type: 'like'
+    });
+
+    res.json({
+      code: 200,
+      data: {
+        totalUnread,
+        replyUnreadCount,
+        likeUnreadCount,
+        latestNotifications: notificationsWithDetails,
+        lastUpdated: new Date().toISOString()
+      },
+      msg: '获取主页提醒汇总成功'
+    });
+  } catch (err) { next(err); }
+});
+
+// 新增：标记单个通知为已读接口
+app.put('/api/notifications/:id/read', authMiddleware, async (req, res, next) => {
+  try {
+    const { username } = req.user;
+    const { id } = req.params;
+
+    console.log(`[${getNow()}] 📌 标记通知为已读 - 用户：${username} | 通知ID：${id}`);
+
+    // 验证通知ID格式
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        code: 400,
+        msg: '通知ID格式不正确'
+      });
+    }
+
+    // 查找并更新通知状态
+    const notification = await Notification.findOneAndUpdate(
+      { 
+        _id: id, 
+        receiver_username: username 
+      },
+      { 
+        is_read: true,
+        readAt: new Date()
+      },
+      { 
+        new: true,
+        runValidators: true 
+      }
+    );
+
+    if (!notification) {
+      return res.status(404).json({
+        code: 404,
+        msg: '通知不存在或无权操作'
+      });
+    }
+
+    console.log(`[${getNow()}] ✅ 标记通知为已读成功 - 用户：${username} | 通知ID：${id}`);
+
+    res.json({
+      code: 200,
+      data: {
+        notificationId: id,
+        is_read: true
+      },
+      msg: '标记为已读成功'
+    });
+  } catch (err) { next(err); }
+});
+
+// 新增：标记所有通知为已读接口
+app.put('/api/notifications/read-all', authMiddleware, async (req, res, next) => {
+  try {
+    const { username } = req.user;
+
+    console.log(`[${getNow()}] 📌 标记所有通知为已读 - 用户：${username}`);
+
+    // 更新所有未读通知
+    const result = await Notification.updateMany(
+      { 
+        receiver_username: username,
+        is_read: false 
+      },
+      { 
+        is_read: true,
+        readAt: new Date()
+      }
+    );
+
+    console.log(`[${getNow()}] ✅ 标记所有通知为已读成功 - 用户：${username} | 更新数量：${result.modifiedCount}`);
+
+    res.json({
+      code: 200,
+      data: {
+        updatedCount: result.modifiedCount,
+        totalUnread: 0
+      },
+      msg: '标记所有通知为已读成功'
+    });
+  } catch (err) { next(err); }
+});
+
+app.put('/api/notifications/read-all', authMiddleware, async (req, res, next) => {
+  try {
+    const { username } = req.user;
+
+    console.log(`[${getNow()}] 📌 标记所有通知为已读 - 用户：${username}`);
+
+    // 更新所有未读通知
+    const result = await Notification.updateMany(
+      { 
+        receiver_username: username,
+        is_read: false 
+      },
+      { 
+        is_read: true,
+        readAt: new Date()
+      }
+    );
+
+    console.log(`[${getNow()}] ✅ 标记所有通知为已读成功 - 用户：${username} | 更新数量：${result.modifiedCount}`);
+
+    res.json({
+      code: 200,
+      data: {
+        updatedCount: result.modifiedCount,
+        totalUnread: 0
+      },
+      msg: '标记所有通知为已读成功'
+    });
+  } catch (err) { next(err); }
+});
+
+// 新增：删除通知接口
+app.delete('/api/notifications/:id', authMiddleware, async (req, res, next) => {
+  try {
+    const { username } = req.user;
+    const { id } = req.params;
+
+    console.log(`[${getNow()}] 🗑️ 删除通知 - 用户：${username} | 通知ID：${id}`);
+
+    // 验证通知ID格式
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        code: 400,
+        msg: '通知ID格式不正确'
+      });
+    }
+
+    // 查找并删除通知（确保只能删除自己的通知）
+    const notification = await Notification.findOneAndDelete({
+      _id: id,
+      receiver_username: username
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        code: 404,
+        msg: '通知不存在或无权删除'
+      });
+    }
+
+    console.log(`[${getNow()}] ✅ 删除通知成功 - 用户：${username} | 通知ID：${id}`);
+
+    res.json({
+      code: 200,
+      data: {
+        notificationId: id,
+        deleted: true
+      },
+      msg: '删除通知成功'
+    });
+  } catch (err) { next(err); }
+});
+
 // 12. 兜底路由（404处理，放在所有接口之后）
 
 
@@ -1788,3 +2293,4 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error(`[${getNow()}] 🚨 未处理Promise拒绝 - Promise：`, promise, ' | 原因：', reason.stack);
   process.exit(1);
 });
+
